@@ -1,0 +1,4 @@
+ preset | init_d | max_d | min_d |  puts  | d_smo | mem_mb | c_idx_ns 
+ dense  |   0.85 |  0.95 |  0.75 | 104522 |    91 |   11.5 |     1043
+ default |    0.7 |   0.8 |   0.6 | 104522 |    92 |   13.2 |      800
+ sparse |    0.5 |   0.6 |   0.4 | 104522 |    92 |   15.5 |      892

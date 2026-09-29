@@ -1,0 +1,43 @@
+===== test_moqoe_logic =====
+test_all_uses_router_ranking (__main__.FilterTest) ... ok
+test_default_argument_behaves_like_all (__main__.FilterTest) ... ok
+test_filter_without_loaded_expert_falls_back (__main__.FilterTest) ... ok
+test_hint_skips_router (__main__.FilterTest) ... ok
+test_join_skips_router (__main__.FilterTest) ... ok
+test_router_error_falls_back (__main__.FilterTest) ... ok
+test_unknown_filter_falls_back (__main__.FilterTest) ... ok
+test_constructor_default_keeps_online_training (__main__.FreezeTest) ... ok
+test_frozen_never_trains (__main__.FreezeTest) ... ok
+test_unfrozen_trains_every_trigger (__main__.FreezeTest) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.002s
+
+OK
+===== test_pg_conn =====
+test_fallback_when_setting_unknown (__main__.ConnectTest) ... ok
+test_option_is_sent (__main__.ConnectTest) ... ok
+test_other_errors_are_not_swallowed (__main__.ConnectTest) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.004s
+
+OK
+===== test_run_server =====
+test_freeze_sets_readonly_cache (__main__.LifecycleTest) ... ok
+test_killed_worker_is_replaced (__main__.LifecycleTest) ... /usr/lib/python3.10/unittest/case.py:549: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>
+  method()
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_several_workers_require_freeze (__main__.LifecycleTest) ... ok
+test_sigterm_stops_parent_and_workers (__main__.LifecycleTest) ... ok
+test_1_three_workers_answer (__main__.MultiWorkerTest) ... ok
+test_2_requests_run_in_parallel_and_filter_is_passed (__main__.MultiWorkerTest) ... ok
+test_3_stats_are_summed_over_workers (__main__.MultiWorkerTest) ... ok
+test_4_unknown_path (__main__.MultiWorkerTest) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 3.627s
+
+OK
+sys:1: ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='UTF-8'>

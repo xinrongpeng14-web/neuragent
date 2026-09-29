@@ -1,0 +1,100 @@
+Timing is on.
+===== V0 扩展与访问方法 =====
+CREATE EXTENSION
+Time: 13.649 ms
+ amname  | amtype 
+---------+--------
+ nram    | t
+ nrindex | i
+(2 rows)
+
+Time: 2.600 ms
+===== V1 heap 表上建 nrindex =====
+psql:/data/p1_verify.sql:9: NOTICE:  table "ycsb" does not exist, skipping
+DROP TABLE
+Time: 0.314 ms
+CREATE TABLE
+Time: 9.555 ms
+INSERT 0 200000
+Time: 771.338 ms
+ANALYZE
+Time: 126.066 ms
+CREATE INDEX
+Time: 358.476 ms
+ indexrelid | indisvalid | indisready 
+------------+------------+------------
+ ycsb_k_nr  | t          | t
+(1 row)
+
+Time: 1.641 ms
+===== V2 同一连接点查 =====
+-- (a) 默认规划器设置, bigint 常量
+                                            QUERY PLAN                                             
+---------------------------------------------------------------------------------------------------
+ Seq Scan on ycsb  (cost=0.00..4370.00 rows=1 width=33) (actual time=5.226..18.659 rows=1 loops=1)
+   Filter: (k = '123456'::bigint)
+   Rows Removed by Filter: 199999
+ Planning Time: 0.317 ms
+ Execution Time: 18.687 ms
+(5 rows)
+
+Time: 19.638 ms
+-- (b) 默认规划器设置, int4 常量 (opclass 只含 int8=int8, 预期用不上索引)
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Seq Scan on ycsb  (cost=0.00..4370.00 rows=1 width=33) (actual time=10.290..26.984 rows=1 loops=1)
+   Filter: (k = 123456)
+   Rows Removed by Filter: 199999
+ Planning Time: 0.108 ms
+ Execution Time: 27.013 ms
+(5 rows)
+
+Time: 27.510 ms
+-- (c) 关闭 seqscan
+SET
+Time: 0.210 ms
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on ycsb  (cost=2.00..4372.00 rows=1 width=33) (actual time=0.026..0.027 rows=1 loops=1)
+   Recheck Cond: (k = '123456'::bigint)
+   Heap Blocks: exact=1
+   ->  Bitmap Index Scan on ycsb_k_nr  (cost=0.00..2.00 rows=200000 width=0) (actual time=0.018..0.018 rows=1 loops=1)
+         Index Cond: (k = '123456'::bigint)
+ Planning Time: 0.086 ms
+ Execution Time: 0.073 ms
+(7 rows)
+
+Time: 0.514 ms
+-- (d) 再关闭 bitmapscan
+SET
+Time: 0.219 ms
+                                                     QUERY PLAN                                                     
+--------------------------------------------------------------------------------------------------------------------
+ Index Scan using ycsb_k_nr on ycsb  (cost=1.00..9482.00 rows=1 width=33) (actual time=0.020..0.021 rows=1 loops=1)
+   Index Cond: (k = '123456'::bigint)
+ Planning Time: 0.063 ms
+ Execution Time: 0.040 ms
+(4 rows)
+
+Time: 0.324 ms
+-- 正确性: 命中 / 未命中 / 与顺序扫描对比
+   k    | ok 
+--------+----
+ 123456 | t
+(1 row)
+
+Time: 0.483 ms
+ miss_should_be_0 
+------------------
+                0
+(1 row)
+
+Time: 0.538 ms
+psql:/data/p1_verify.sql:39: NOTICE:  V2 random point lookups: 2000 checked, 170 wrong
+DO
+Time: 23.100 ms
+===== V3 同一连接持续插入后点查 =====
+psql:/data/p1_verify.sql:42: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+psql:/data/p1_verify.sql:42: error: connection to server was lost

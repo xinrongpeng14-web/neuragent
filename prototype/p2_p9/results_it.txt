@@ -1,0 +1,20 @@
+=== E1 两个工作进程, 真实输出格式 ===
+  PASS  E1a hint 档: 9 条 SET (先关后开) 生效  (Nested Loop)
+  PASS  E1b 语句后两个开关均为 on  (on/on/)
+  PASS  E1c join 档: 提示格式生效  (Merge Join)
+  PASS  E1d all 档  (Merge Join)
+  PASS  E1e /stats: 请求/优化/错误  (3/3/0)
+  PASS  E1f /stats: 各过滤档计数 all/hint/join  (1/1/1)
+  PASS  E1g /stats: 各专家计数 Hint/Join  (1/2)
+  PASS  E1h /stats: 工作进程数  (2)
+=== E2 以启动参数关闭 molqo 的机制 (服务端默认已开启) ===
+  PASS  E2a 普通连接: 服务端默认值  (on)
+  PASS  E2b 带启动参数的连接, 经过 DISCARD ALL 与 RESET ALL 后  (off/off/off/)
+=== E3 专家回连数据库执行 EXPLAIN (单工作进程, 服务端默认开启 molqo) ===
+  INFO  回连方式=guarded: 计划=Merge Join  耗时=.0976s  超时告警=0  服务端收到请求数=1
+  PASS  E3a 回连带启动参数: 无递归, 计划已优化  (Merge Join/1/1)
+  INFO  回连方式=unguarded: 计划=Hash Join  耗时=3.080s  超时告警=1  服务端收到请求数=4
+  PASS  E3b 回连不带参数: 发生递归, 靠超时回退  (Hash Join/1)
+=== 通过 12, 失败 0 ===
+--- 日志异常 ---
+9

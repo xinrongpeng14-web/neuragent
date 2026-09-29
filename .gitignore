@@ -1,0 +1,21 @@
+# Clones of other people's repositories. They are never part of this
+# repository; changes to them are kept as patches under patches/.
+/NeuralDB/
+/CHMAS/
+
+# Local Python environment and caches
+/.venv/
+__pycache__/
+*.pyc
+
+# Outputs of experiment runs
+/experiment/runs/
+
+# Scratch
+/.verify_tmp/
+
+# Held back from this public repository: these files contain NeurDB source
+# code, whose licence reserves all rights. See patches/neurdb/README.md.
+/patches/neurdb/*.patch
+/prototype/p1/*.patch
+/prototype/p1/*.patched

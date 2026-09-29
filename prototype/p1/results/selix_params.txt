@@ -1,0 +1,6 @@
+node= 8MB d=0.80/0.90/0.70 read=0.9 |  6588165 ops/s  0.152 us/op | mem  19.2 ->  20.6 MB | data_nodes=14 smo=119 (sink=1)
+node=16MB d=0.70/0.80/0.60 read=0.9 |  4911142 ops/s  0.204 us/op | mem  22.0 ->  23.6 MB | data_nodes=8 smo=42 (sink=1)
+node=32MB d=0.50/0.60/0.40 read=0.9 |  4016679 ops/s  0.249 us/op | mem  30.8 ->  40.6 MB | data_nodes=12 smo=15 (sink=1)
+node= 8MB d=0.80/0.90/0.70 read=0.3 |  2395944 ops/s  0.417 us/op | mem  19.2 ->  34.7 MB | data_nodes=14 smo=195 (sink=0)
+node=16MB d=0.70/0.80/0.60 read=0.3 |  2769745 ops/s  0.361 us/op | mem  22.0 ->  41.2 MB | data_nodes=6 smo=51 (sink=0)
+node=32MB d=0.50/0.60/0.40 read=0.3 |  1751800 ops/s  0.571 us/op | mem  30.8 ->  54.3 MB | data_nodes=19 smo=75 (sink=0)

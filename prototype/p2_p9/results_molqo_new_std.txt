@@ -1,0 +1,26 @@
+new_build_exit=0
+=== [新代码-标准加载顺序] preload: pg_hint_plan, nr_molqo, nram ===
+  PASS  C1 基线: molqo 关闭  (Hash Join)
+  PASS  C2a SET 格式生效  (Nested Loop)
+  PASS  C2b 语句后 enable_hashjoin 已复位  (on)
+  PASS  C2c 语句后 enable_mergejoin 已复位  (on)
+  PASS  C2d 同会话下一条查询不受影响  (Hash Join)
+  PASS  C3 提示格式生效  (Merge Join)
+  PASS  C4a 超时后回退到原生计划  (Hash Join)
+  PASS  C4b 给出超时告警  (1)
+  PASS  C4c 总耗时小于 2.5 秒 (实际 1.043956163s)  (1)
+  PASS  C5 expert_filter 随请求发送  (all,hint,join,)
+  PASS  C5b 非法取值被拒绝  (1)
+  PASS  C6 含引号/反斜杠/换行/制表符的 SQL 往返一致  (t)
+  PASS  C7 20KB 长 SQL 往返一致  (t)
+  PASS  C8 查询体内含 'SET ' 字样 (OFFSET) 不被误解析  (Nested Loop/0)
+  FAIL  C9 未知参数只告警, 其余设置照常生效  (got: Nested Loop/2/alive, want: Nested Loop/1/alive)
+  PASS  C10 查询执行报错后设置仍已复位  (1/on)
+  PASS  C11 连续 300 条查询后进程存活且设置为默认  (300/on/alive/)
+  INFO  C12 预备语句: 第 1 次 EXECUTE = Nested Loop, 第 2 次 EXECUTE = Nested Loop
+  INFO  C13 EXPLAIN 是否触发优化请求: Nested Loop, 请求数 = 1
+=== [新代码-标准加载顺序] 通过 16, 失败 1 ===
+
+--- C9 原始输出中的告警行 ---
+1:WARNING:  unrecognized configuration parameter "no_such_guc"
+2:LOG:  duration: 6.817 ms  plan:

@@ -1,0 +1,69 @@
+DROP TABLE
+psql:/data/p1_perf.sql:5: NOTICE:  table "ycsb_bt" does not exist, skipping
+DROP TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 1000000
+INSERT 0 1000000
+ANALYZE
+ANALYZE
+--- 后端进程内存: 建 nrindex 之前
+VmRSS:	  177980 kB
+Timing is on.
+CREATE INDEX
+Time: 1241.947 ms (00:01.242)
+CREATE INDEX
+Time: 1851.351 ms (00:01.851)
+Timing is off.
+--- 后端进程内存: 建 nrindex 之后 (100 万键)
+VmRSS:	  219892 kB
+ btree_index_size 
+------------------
+ 21 MB
+(1 row)
+
+SET
+SET
+CREATE FUNCTION
+--- 点查 20 万次
+                    bench                     
+----------------------------------------------
+ ycsb read: 200000 ops, 200000 ok, 9149 ops/s
+(1 row)
+
+                      bench                      
+-------------------------------------------------
+ ycsb_bt read: 200000 ops, 200000 ok, 6674 ops/s
+(1 row)
+
+--- 插入 20 万次 (随机键)
+                      bench                      
+-------------------------------------------------
+ ycsb insert: 200000 ops, 200000 ok, 14827 ops/s
+(1 row)
+
+                       bench                        
+----------------------------------------------------
+ ycsb_bt insert: 200000 ops, 200000 ok, 15404 ops/s
+(1 row)
+
+--- 插入后再点查 20 万次
+                    bench                     
+----------------------------------------------
+ ycsb read: 200000 ops, 200000 ok, 8396 ops/s
+(1 row)
+
+                      bench                      
+-------------------------------------------------
+ ycsb_bt read: 200000 ops, 200000 ok, 7214 ops/s
+(1 row)
+
+--- 后端进程内存: 全部操作之后
+VmRSS:	  265968 kB
+--- 计划确认
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Index Scan using ycsb_k_nr on ycsb  (cost=1.00..53710.00 rows=1 width=27)
+   Index Cond: (k = '2468'::bigint)
+(2 rows)
+

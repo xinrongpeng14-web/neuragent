@@ -1,0 +1,5 @@
+numpy>=1.24
+psycopg2-binary>=2.9
+gymnasium>=0.29
+# needed from the training step on:
+# stable-baselines3>=2.3

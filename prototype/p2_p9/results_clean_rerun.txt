@@ -1,0 +1,10 @@
+  INFO  C12 预备语句: 第 1 次 EXECUTE = Nested Loop, 第 2 次 EXECUTE = Nested Loop
+  INFO  C13 EXPLAIN 是否触发优化请求: Nested Loop, 请求数 = 1
+=== [新代码-标准顺序-干净重启] 通过 17, 失败 0 ===
+psql:/data/p1_verify.sql:39: NOTICE:  V2 random point lookups: 2000 checked, 0 wrong
+psql:/data/p1_verify.sql:52: NOTICE:  V3 lookups of newly inserted keys: 2000 checked, 0 wrong
+psql:/data/p1_verify.sql:56: ERROR:  invalid typLen: 0
+psql:/data/t/selix_t1_stats.sql:37: ERROR:  1.5 is outside the valid range for parameter "selix.max_density" (0.01 .. 1)
+psql:/data/t/selix_t1_stats.sql:50: NOTICE:  T4: 6000 lookups, 0 keys present in table but missing from index
+--- 本轮新增日志中的异常 ---
+0

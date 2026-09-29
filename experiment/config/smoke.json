@@ -1,0 +1,15 @@
+{
+  "db": {"host": "@DB_HOST@", "port": 5432, "dbname": "neurdb", "user": "neurdb"},
+  "container": {"name": "@CONTAINER@", "ncpus": 1.5},
+  "nqo": {"stats_url": "http://@DB_HOST@:8666/stats"},
+  "job": {"query_dir": "@ROOT@/smoke/queries", "max_clients": 2, "statement_timeout_ms": 20000},
+  "ycsb": {"initial_keys": 100000},
+  "phases": [
+    {"name": "A", "steps": 3, "job_clients": 2, "ycsb_read_ratio": 0.9, "ycsb_rate": 500},
+    {"name": "B", "steps": 3, "job_clients": 1, "ycsb_read_ratio": 0.3, "ycsb_rate": 1500}
+  ],
+  "step_s": 5,
+  "warmup_steps": 1,
+  "refs_path": "@ROOT@/runs/smoke/refs.json",
+  "log_dir": "@ROOT@/runs/smoke"
+}

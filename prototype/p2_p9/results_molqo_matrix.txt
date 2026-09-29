@@ -1,0 +1,39 @@
+  PASS  C7 20KB 长 SQL 往返一致  (t)
+  PASS  C8 查询体内含 'SET ' 字样 (OFFSET) 不被误解析  (Nested Loop/0)
+  PASS  C9 未知参数只告警, 其余设置照常生效  (Nested Loop/1/alive)
+  PASS  C10 查询执行报错后设置仍已复位  (1/on)
+  PASS  C11 连续 300 条查询后进程存活且设置为默认  (300/on/alive/)
+  INFO  C12 预备语句: 第 1 次 EXECUTE = Nested Loop, 第 2 次 EXECUTE = Nested Loop
+  INFO  C13 EXPLAIN 是否触发优化请求: Nested Loop, 请求数 = 1
+=== [新代码-标准顺序] 通过 17, 失败 0 ===
+
+######## 对照 ########
+=== [原版-标准顺序] preload=pg_hint_plan, nr_molqo, nram compute_query_id=auto ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=off
+  提示格式: 计划=Hash Join
+  服务端延迟 3 秒时的查询耗时: 3.044 秒
+=== [原版-标准顺序-queryid开] preload=pg_hint_plan, nr_molqo, nram compute_query_id=on ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=off
+  提示格式: 计划=Hash Join
+  服务端延迟 3 秒时的查询耗时: 3.048 秒
+=== [原版-反向顺序-queryid开] preload=nr_molqo, pg_hint_plan, nram compute_query_id=on ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=off
+  提示格式: 计划=Hash Join
+  服务端延迟 3 秒时的查询耗时: 3.049 秒
+=== [新版-标准顺序] preload=pg_hint_plan, nr_molqo, nram compute_query_id=auto ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=on
+  提示格式: 计划=Merge Join
+  服务端延迟 3 秒时的查询耗时: 3.063 秒
+=== [新版-标准顺序-queryid开] preload=pg_hint_plan, nr_molqo, nram compute_query_id=on ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=on
+  提示格式: 计划=Merge Join
+  服务端延迟 3 秒时的查询耗时: 3.046 秒
+=== [新版-反向顺序] preload=nr_molqo, pg_hint_plan, nram compute_query_id=auto ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=on
+  提示格式: 计划=Hash Join
+  服务端延迟 3 秒时的查询耗时: 3.040 秒
+=== [新版-反向顺序-queryid开] preload=nr_molqo, pg_hint_plan, nram compute_query_id=on ===
+  SET 格式: 计划=Nested Loop  语句后 enable_hashjoin=on
+  提示格式: 计划=Merge Join
+  服务端延迟 3 秒时的查询耗时: 3.171 秒
+10

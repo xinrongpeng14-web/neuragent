@@ -1,0 +1,12 @@
+[flip=1] bulk_load n=200000 data_nodes=395 model_nodes=1 rss=10MB
+[flip=1] lookup after bulk_load: notfound=1024 wrong_payload=0 of 200000
+[flip=1] insert done=0 in 0.00s (0 ops/s)
+[flip=1] lookup of inserted keys: notfound=0 wrong_payload=0 of 0
+[flip=1] lookup of original keys after inserts: notfound=1024 wrong_payload=0 of 200000
+[flip=0] bulk_load n=200000 data_nodes=2 model_nodes=0 rss=10MB
+[flip=0] lookup after bulk_load: notfound=0 wrong_payload=0 of 200000
+[flip=0] inserted=50000 rss=13MB data_nodes=142 expand_retrain=0 splits=140
+[flip=0] inserted=100000 rss=14MB data_nodes=285 expand_retrain=0 splits=283
+[flip=0] insert done=100000 in 0.05s (1911278 ops/s)
+[flip=0] lookup of inserted keys: notfound=0 wrong_payload=0 of 100000
+[flip=0] lookup of original keys after inserts: notfound=0 wrong_payload=0 of 200000

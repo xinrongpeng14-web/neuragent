@@ -1,0 +1,93 @@
+SET
+DROP TABLE
+DROP TABLE
+ setseed 
+---------
+ 
+(1 row)
+
+SELECT 329970
+CREATE TABLE
+INSERT 0 300000
+CREATE INDEX
+SET
+SET
+CREATE FUNCTION
+RESET
+===== T1 统计函数与计数器 =====
+-- 建索引后: n_keys 应等于表行数, mem_bytes > 0
+ keys_le_seed | n_keys | n_indexes | has_mem | n_get | n_put 
+--------------+--------+-----------+---------+-------+-------
+ t            | 300000 |         1 | t       |     0 |     0
+(1 row)
+
+SELECT 1
+-- 执行 4 万次操作, 读比例 0.5
+ ran 
+-----
+ t
+(1 row)
+
+ d_get | d_put | d_total | d_cget | d_cput | get_sample_rate | put_sample_rate | get_ns_per_op | put_ns_per_op | d_keys 
+-------+-------+---------+--------+--------+-----------------+-----------------+---------------+---------------+--------
+ 20057 | 19943 |   40000 |   2508 |   2493 |          0.1250 |          0.1250 |           752 |           835 |  19943
+(1 row)
+
+===== T2 采样率开关 =====
+DROP TABLE
+SELECT 1
+SET
+ ran 
+-----
+ t
+(1 row)
+
+   cfg   | ops  | sampled 
+---------+------+---------
+ every=0 | 8000 |       0
+(1 row)
+
+DROP TABLE
+SELECT 1
+SET
+ ran 
+-----
+ t
+(1 row)
+
+   cfg   | ops  | sampled 
+---------+------+---------
+ every=1 | 8000 |    8000
+(1 row)
+
+RESET
+===== T3 非法密度组合: 应告警并保持原值 =====
+ init_density | max_density | min_density 
+--------------+-------------+-------------
+          0.7 |         0.8 |         0.6
+(1 row)
+
+SET
+psql:/data/t/selix_t1_stats.sql:29: WARNING:  selix density parameters ignored: need 0 < min < init < max <= 1
+DETAIL:  init=0.9 max=0.8 min=0.6; the previous values stay in effect.
+INSERT 0 1
+ init_density | max_density | min_density 
+--------------+-------------+-------------
+          0.7 |         0.8 |         0.6
+(1 row)
+
+-- 补齐另外两个参数后应生效
+SET
+SET
+SET
+INSERT 0 1
+ init_density | max_density | min_density 
+--------------+-------------+-------------
+         0.85 |        0.95 |        0.75
+(1 row)
+
+-- 越界取值应被 GUC 范围检查拒绝
+psql:/data/t/selix_t1_stats.sql:37: ERROR:  1.5 is outside the valid range for parameter "selix.max_density" (0.01 .. 1)
+===== T4 点查正确性 (切换参数并插入之后) =====
+psql:/data/t/selix_t1_stats.sql:50: NOTICE:  T4: 5775 lookups, 0 keys present in table but missing from index
+DO
