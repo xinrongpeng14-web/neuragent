@@ -6,6 +6,7 @@
 
 | 路径 | 内容 |
 |---|---|
+| `WORKLOG.md` | 工作日志：每次总结的内容、每一项的结果与遗留事项 |
 | `GlobalAgent_design.md` | 完整方案，v0.3 已按实测结果修订 |
 | `GlobalAgent_prototype.md` | 雏形方案：用一次对比实验判断可行性 |
 | `NeuralDB_code_analysis.md` | NeurDB 代码分析，重点是 NQO 与 SELIX |
