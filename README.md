@@ -6,7 +6,7 @@
 
 | 路径 | 内容 |
 |---|---|
-| `GlobalAgent_design.md` | 完整方案 |
+| `GlobalAgent_design.md` | 完整方案，v0.3 已按实测结果修订 |
 | `GlobalAgent_prototype.md` | 雏形方案：用一次对比实验判断可行性 |
 | `NeuralDB_code_analysis.md` | NeurDB 代码分析，重点是 NQO 与 SELIX |
 | `CHMAS_paper_vs_code.md` | CHMAS 论文与其代码的对照 |
@@ -32,4 +32,6 @@
 | P1 SELIX 通路验证 | 完成 |
 | P1a 到 P9 前置改动 | 完成；真实 NQO 模型尚未端到端验证 |
 | 实验程序 | 完成，已通过单元测试与端到端冒烟测试 |
+| 完整方案按实测结果修订 | 完成 |
+| 训练与评估脚本 | 未开始 |
 | 原版基线、训练、评估 | 未开始，需要至少 8 核 16GB 的机器 |
