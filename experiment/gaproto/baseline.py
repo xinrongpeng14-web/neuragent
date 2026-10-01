@@ -22,6 +22,7 @@ from .env import make_env
 
 def run(cfg, episodes: int, seed: int, run_name: str) -> List[Dict[str, Any]]:
     env = make_env(cfg, refs_path=None, run_name=run_name, fixed_action=A.ORIGINAL_ACTION)
+    env.set_tag("original")
     records: List[Dict[str, Any]] = []
     try:
         for ep in range(episodes):

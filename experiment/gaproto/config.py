@@ -20,12 +20,16 @@ class DbConfig:
 
 @dataclass
 class ContainerConfig:
-    name: str = "neurdb"
-    # CPU cores the container may use; the denominator of cpu_util
-    ncpus: float = 4.0
-    # Directory holding cpu.stat of the container's cgroup. Located through
-    # `docker inspect` when empty; read through `docker exec` as a last resort.
+    # Name of the database container when the experiment runs on the host.
+    # Empty means the experiment runs inside the container (the normal case).
+    name: str = ""
+    # CPU cores the container may use; the denominator of cpu_util.
+    # 0 derives it from the container's cpu.max or cpuset.
+    ncpus: float = 0.0
+    # Directory holding cpu.stat of the container's cgroup; derived when empty.
     cgroup_dir: str = ""
+    # per-process CPU and memory accounting from /proc (only inside the container)
+    proc_stats: bool = True
 
 
 @dataclass
@@ -152,8 +156,8 @@ def validate(cfg: Config) -> None:
             raise ValueError(f"phase {p.name}: job_clients must be within [0, job.max_clients]")
         if p.ycsb_rate < 0:
             raise ValueError(f"phase {p.name}: ycsb_rate must not be negative")
-    if cfg.container.ncpus <= 0:
-        raise ValueError("container.ncpus must be positive")
+    if cfg.container.ncpus < 0:
+        raise ValueError("container.ncpus must not be negative (0 = detect)")
     if cfg.ycsb.initial_keys < 1:
         raise ValueError("ycsb.initial_keys must be at least 1")
 

@@ -23,10 +23,14 @@ from .db import Admin
 from .job_driver import JobDriver, load_queries
 from .nqo_client import delta as nqo_delta
 from .nqo_client import fetch_stats
+from .procstat import ProcSampler, summarize as proc_summarize
 from .reset import load_lookup_keys, prepare_seed_table, reset_table
 from .ycsb_driver import YcsbDriver
 
 NQO_SETTING_NAMES = ("enable_molqo", "molqo.expert_filter")
+# fields of /stats that are not counters
+NQO_NON_COUNTERS = ("workers", "uptime_s")
+PG_ACTIVITY_SQL = "SELECT pid, backend_type, application_name FROM pg_stat_activity"
 
 
 class GaEnv(gym.Env):
@@ -51,6 +55,9 @@ class GaEnv(gym.Env):
         self.admin = Admin(cfg.db)
         prepare_seed_table(self.admin, cfg.ycsb)
         self.cgroup = CgroupReader(cfg.container.name, cfg.container.ncpus, cfg.container.cgroup_dir)
+        # per-process accounting needs the container's own /proc
+        self.procs = (ProcSampler(lambda: self.admin.fetchall(PG_ACTIVITY_SQL))
+                      if cfg.container.proc_stats and not cfg.container.name else None)
         self.ycsb = YcsbDriver(cfg.db, cfg.ycsb, load_lookup_keys(self.admin, cfg.ycsb))
         self.job = JobDriver(cfg.db, cfg.job, load_queries(cfg.job.query_dir))
 
@@ -60,8 +67,16 @@ class GaEnv(gym.Env):
         self.nqo_mode = ""
         self.selix_preset = ""
         self.last_reset: Dict[str, Any] = {}
+        # free-form label written into every log record (the arm or policy being run)
+        self.tag = ""
+        self._last_obs: Optional[np.ndarray] = None
         self._closed = False
         self._log = open(log_path, "a", encoding="utf-8") if log_path else None
+        self._write_log({"event": "open", "cgroup": self.cgroup.limits(),
+                         "proc_stats": self.procs is not None})
+
+    def set_tag(self, tag: str) -> None:
+        self.tag = str(tag)
 
     # ------------------------------------------------------------------
     def _apply_phase(self, step: int) -> str:
@@ -91,6 +106,7 @@ class GaEnv(gym.Env):
     def _run_interval(self) -> M.StepMetrics:
         """Let the workload run for step_s seconds and measure it."""
         cg0 = self.cgroup.sample()
+        pr0 = self.procs.sample() if self.procs else None
         nq0 = fetch_stats(self.cfg.nqo.stats_url, self.cfg.nqo.timeout_s)
         y0 = self.ycsb.snapshot()   # also clears the client counters
         self.job.snapshot()         # clears the completions collected so far
@@ -102,6 +118,7 @@ class GaEnv(gym.Env):
         j1 = self.job.snapshot()
         elapsed = time.monotonic() - t0
         cg1 = self.cgroup.sample()
+        pr1 = self.procs.sample() if self.procs else None
         nq1 = fetch_stats(self.cfg.nqo.stats_url, self.cfg.nqo.timeout_s)
 
         m = M.StepMetrics(elapsed_s=elapsed)
@@ -112,6 +129,14 @@ class GaEnv(gym.Env):
         m.nqo_reachable = nq0 is not None and nq1 is not None
         m.nqo_requests = nqo_delta(nq0, nq1, "requests")
         m.nqo_opt_time_ms = nqo_delta(nq0, nq1, "opt_time_ms")
+        if nq0 and nq1:
+            m.nqo_counters = {k: nqo_delta(nq0, nq1, k) for k in nq1 if k not in NQO_NON_COUNTERS}
+        if pr0 is not None and pr1 is not None:
+            summary = proc_summarize(pr0, pr1)
+            m.proc_cpu_s = summary["cpu_s"]
+            m.proc_rss_bytes = summary["rss_bytes"]
+            m.proc_pss_bytes = summary["pss_bytes"]
+            m.proc_count = summary["count"]
         return m
 
     def _write_log(self, record: Dict[str, Any]) -> None:
@@ -148,12 +173,17 @@ class GaEnv(gym.Env):
         for _ in range(max(1, self.cfg.warmup_steps)):
             m = self._run_interval()
 
-        self.last_reset = {"episode": self.episode, "episode_seed": episode_seed,
+        # "episode_index" rather than "episode": stable-baselines3 reserves the info
+        # key "episode" for its own episode statistics
+        self.last_reset = {"episode_index": self.episode, "episode_seed": episode_seed,
                            "reload_s": reload_s, "index_build_s": started["build_s"],
                            "index_keys": int(started["stats"]["n_keys"])}
         obs = M.observation(m, self.refs, phase, 0, self.nqo_mode, self.selix_preset)
-        info = {**self.last_reset, "phase": phase, "metrics": m.to_record()}
-        self._write_log({"event": "reset", **info})
+        info = {**self.last_reset, "phase": phase, "nqo_mode": self.nqo_mode,
+                "selix_preset": self.selix_preset, "metrics": m.to_record()}
+        self._last_obs = obs
+        self._write_log({"event": "reset", "tag": self.tag, "episode": self.episode, **info,
+                         "obs": obs.tolist()})
         return obs, info
 
     def step(self, action) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
@@ -161,6 +191,7 @@ class GaEnv(gym.Env):
             action = self.fixed_action
         action = int(action)
         step = self.step_idx
+        obs_in = self._last_obs      # what the agent saw when it chose this action
         phase = self._apply_phase(step)
         switched = self._apply_action(action)
 
@@ -182,11 +213,14 @@ class GaEnv(gym.Env):
         obs = M.observation(m, self.refs, next_phase if not truncated else phase,
                             min(self.step_idx, self.cfg.episode_steps - 1),
                             self.nqo_mode, self.selix_preset)
-        info = {"episode": self.episode, "step": step, "phase": phase, "action": action,
+        info = {"episode_index": self.episode, "step": step, "phase": phase, "action": action,
                 "nqo_mode": self.nqo_mode, "selix_preset": self.selix_preset,
                 "switched": int(switched), "reward": reward, **reward_info,
                 "metrics": m.to_record()}
-        self._write_log({"event": "step", **info})
+        self._last_obs = obs
+        self._write_log({"event": "step", "tag": self.tag, "episode": self.episode, **info,
+                         "obs_in": None if obs_in is None else obs_in.tolist(), "obs": obs.tolist(),
+                         "terminated": terminated, "truncated": truncated})
         return obs, reward, terminated, truncated, info
 
     def close(self) -> None:

@@ -101,7 +101,7 @@ class ConfigTest(unittest.TestCase):
             load_config(self.write({"db": {"hostname": "x"}}))
 
     def test_validation(self):
-        for bad in ({"step_s": 0}, {"phases": []}, {"container": {"ncpus": 0}},
+        for bad in ({"step_s": 0}, {"phases": []}, {"container": {"ncpus": -1}},
                     {"phases": [{"name": "A", "ycsb_read_ratio": 1.5}]},
                     {"phases": [{"name": "A", "job_clients": 99}]}):
             with self.assertRaises(ValueError, msg=str(bad)):

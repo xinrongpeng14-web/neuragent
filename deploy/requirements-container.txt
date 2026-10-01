@@ -1,0 +1,21 @@
+# Python packages of the container environment /opt/venv (installed by deploy/install_inside.sh
+# with --extra-index-url for the CPU build of torch). psqlparse is installed separately.
+#
+# NQO service, pinned as in NeuralDB/aiengine/neurqo_frame/environment_moqoe.yml
+torch==2.2.2
+numpy==1.24.4
+pandas==1.5.1
+scikit-learn==1.3.2
+scipy==1.10.1
+pglast==7.3
+networkx==3.1
+joblib==1.4.2
+tqdm==4.67.1
+tensorboard==2.14.0
+pyyaml==6.0.2
+absl-py
+psycopg2-binary==2.9.10
+# experiment program. stable-baselines3 2.4 is the last release that accepts torch 2.2;
+# newer releases would pull in torch 2.3 with its CUDA libraries.
+gymnasium==1.0.0
+stable-baselines3==2.4.1

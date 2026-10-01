@@ -1,5 +1,7 @@
+# host-side development environment (.venv). The container environment is
+# defined in deploy/requirements-container.txt.
 numpy>=1.24
 psycopg2-binary>=2.9
-gymnasium>=0.29
-# needed from the training step on:
-# stable-baselines3>=2.3
+gymnasium>=1.0
+# training and the ppo policies need stable-baselines3 with a CPU torch:
+#   pip install --extra-index-url https://download.pytorch.org/whl/cpu torch stable-baselines3

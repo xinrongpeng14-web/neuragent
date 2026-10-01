@@ -19,3 +19,8 @@ __pycache__/
 /patches/neurdb/*.patch
 /prototype/p1/*.patch
 /prototype/p1/*.patched
+
+# JOB query files and the fast subset are fetched/generated on the experiment machine
+# (deploy/load_imdb.sh, experiment/pipeline.sh queries)
+/experiment/queries/job_all/
+/experiment/queries/job_fast/

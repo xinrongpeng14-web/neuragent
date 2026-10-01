@@ -53,6 +53,13 @@ class StepMetrics:
     nqo_requests: float = 0.0
     nqo_opt_time_ms: float = 0.0
     nqo_reachable: bool = True
+    # all counters of the service's /stats, as increments over the step
+    nqo_counters: Dict[str, float] = field(default_factory=dict)
+    # per component, from /proc inside the container (see procstat.py)
+    proc_cpu_s: Dict[str, float] = field(default_factory=dict)
+    proc_rss_bytes: Dict[str, int] = field(default_factory=dict)
+    proc_pss_bytes: Dict[str, int] = field(default_factory=dict)
+    proc_count: Dict[str, int] = field(default_factory=dict)
 
     @property
     def ycsb_ops(self) -> int:

@@ -1,6 +1,6 @@
 {
   "db": {"host": "127.0.0.1", "port": 5432, "dbname": "imdb_ori", "user": "neurdb"},
-  "container": {"name": "neurdb", "ncpus": 4},
+  "container": {"name": "", "ncpus": 0, "proc_stats": true},
   "nqo": {"stats_url": "http://127.0.0.1:8666/stats"},
   "job": {"query_dir": "queries/job_fast", "max_clients": 8, "statement_timeout_ms": 60000},
   "ycsb": {"initial_keys": 1000000},
@@ -10,6 +10,6 @@
   ],
   "step_s": 30,
   "warmup_steps": 1,
-  "refs_path": "runs/refs.json",
-  "log_dir": "runs"
+  "refs_path": "runs/imdb/refs.json",
+  "log_dir": "runs/imdb"
 }
