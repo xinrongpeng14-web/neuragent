@@ -20,8 +20,9 @@ authorised individuals. A patch contains lines of the file it changes, so the
 three patch files are excluded from git by `.gitignore` and exist only in the
 working copy of whoever produced them.
 
-If you are entitled to publish them, remove the block marked "Held back" from
-`.gitignore`, then add and commit the files.
+Decision (2026-10-02): the patch files stay private. They exist only on the
+development machine and are copied to an experiment machine with `scp`, see
+`TUTORIAL.md` step 1.
 
 ## Applying the patches
 

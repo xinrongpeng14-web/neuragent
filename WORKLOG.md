@@ -14,6 +14,75 @@
 
 ---
 
+## 2026-10-01
+
+### 1. 部署脚本：在另一台机器上从零建起实验环境
+
+**做了什么**：写了 `deploy/` 下的六个脚本：建容器、容器内编译安装、装载 IMDB 与 JOB 查询、启停服务、安装检查。安装脚本分步打标记，失败后可以重跑。然后在本机按脚本从零建了容器 `neurdb-ga`，完整走了一遍。
+
+**结果**：
+
+- 集群初始化因为 NeurDB 的 initdb 建的引导库叫 `neurdb`，没有 `postgres` 库，导致脚本连接 `postgres` 失败、安装中止。改为连接 `template1` 后，现在初始化与建库正常完成。
+- 重跑安装脚本因为没有记住第一次传入的内存参数，`shared_buffers` 回落到默认的 4GB，导致本机内存吃紧，后台的 IMDB 装载被系统终止一次。把参数记录到 `/opt/.ga_stamps/settings.env` 并在重跑时沿用后，现在设置不会丢失。装载改为先 `TRUNCATE` 再导入，续跑时不会重复插入。
+- IMDB 装载因为 NeurDB 自带的脚本按 `csv header` 导入，而这份压缩包里的 CSV 没有表头行，会丢掉每张表的第一行。改为不带表头导入后，现在 21 张表的行数全部与基准一致，库 9.1GB。
+- 并行导入命令因为 `\copy` 的引号嵌套在 `xargs` 里出错，导致命令拼接不完整。改为导出一个 shell 函数再调用后，现在每张表的导入命令正确。
+- 部署检查共 26 项，现在全部通过。
+
+**产出**：`deploy/`，容器 `neurdb-ga`（数据卷 `neurdb-ga-data`）。
+
+### 2. 真实 NQO 模型在新环境中跑通
+
+**做了什么**：按 `environment_moqoe.yml` 的版本在 Python 3.10 上装 NQO 的依赖，用真实模型启动服务，把 JOB 查询送给两位专家，并经 nr_molqo 执行。
+
+**结果**：
+
+- NQO 服务因为 `controller_offline.py` 引用了 `tensorboard`，而依赖清单里没有，导致工作进程启动即退出。补上 `tensorboard==2.14.0` 后，现在 1 个工作进程 5 到 8 秒启动，驻留内存约 350MB。
+- 依赖安装因为新版 stable-baselines3 会把 torch 升级到带 CUDA 的 2.3 以上，导致下载数 GB 的 CUDA 库。把 stable-baselines3 固定为 2.4.1、torch 固定为 2.2.2 CPU 版后，现在两者共存。
+- NQO 服务因为是单线程，推理期间 `/stats` 请求要排队，导致实验程序取统计时超时；客户端提前断开时还会在日志里打出断管异常。改为每个连接一个线程、推理用锁串行化，并忽略断管后，现在推理进行中 `/stats` 30 到 50 毫秒返回。
+- JoinOrder 专家对查询 1a 等快查询不改写，对 19d 给出 `/*+Leading(chn ci)*/`，且经 pg_hint_plan 生效后计划与原生计划不同。这不是错误：代码里只有预测原生计划超过 100 毫秒时才给提示。已写进 `STATES_AND_ACTIONS.md`，并按此调整了检查项。
+- 检查中的 `EXPLAIN` 因为 nr_molqo 会把整条语句文本发给服务，专家无法处理以 `EXPLAIN` 开头的文本。改为直接执行查询后，现在端到端检查有效。
+
+**产出**：`deploy/requirements-container.txt`，`experiment/tools/nqo_probe.py`，补丁 `0003` 已重新生成。
+
+### 3. 训练、评估、报告与资源统计
+
+**做了什么**：写了 PPO 训练、五个对照臂（none、nqo、selix、both、ga）交替评估、报告生成、按组件的 CPU 与内存统计、JOB 快查询筛选和分阶段流水线脚本。用缩短配置在新容器里把整条流水线跑完。
+
+**结果**：
+
+- 训练因为环境在 `info` 里用了 `episode` 这个键，而 stable-baselines3 把它保留给自己的回合统计，导致第一个回合结束时报 `TypeError`。改名为 `episode_index` 后，现在训练正常更新并保存模型。
+- 流水线脚本因为把阶段名也传给了下游程序，导致筛选查询的工具报"无法识别的参数"。改为先移除阶段名再传参后，现在各阶段正常执行。
+- 资源统计因为 YCSB 与 JOB 驱动进程以 spawn 方式启动，命令行里没有 `gaproto`，导致它们被归入"其他"。新增 `drivers` 组后，现在 GA 自身开销（`harness`）与负载发生器分开统计。
+- 观测日志因为只记了执行动作之后的观测，导致报告里"观测 → 动作"的示例对不上。改为同时记录做决策时看到的观测 `obs_in` 后，现在示例行是 GA 实际据以决策的输入。
+- 缩短配置的流水线跑通：30 条 JOB 查询在 2 秒内完成，原版基线写出参考值，SELIX 扫描选出 dense 档，训练 12 步，五个臂各评估 1 回合，报告各节都有数据。本机的数字只说明程序可用，不代表方案效果。
+- 单元测试现在 49 / 49 通过。
+
+**产出**：`experiment/gaproto/{train,evaluate,report,policies,procstat}.py`，`experiment/pipeline.sh`，`experiment/tools/select_job_queries.py`，`experiment/config/imdb.json`、`imdb_short.json`。
+
+### 4. 文档
+
+**做了什么**：写了操作教程和状态与动作的枚举，修订雏形方案。
+
+**结果**：
+
+- `TUTORIAL.md` 写明从取代码、复制补丁、建容器、装载数据、检查到分阶段跑实验的全过程，每步有检查点，并列出本机已验证的内容和修掉的问题。
+- `experiment/STATES_AND_ACTIONS.md` 枚举 NQO 与 SELIX 独立运行时的输入状态和输出动作，以及 GA 的 9 维状态和 12 个动作，并对应到报告中的运行时证据。
+- `GlobalAgent_prototype.md` 升到 v0.5：对照臂改为五个，新增 SELIX 档位扫描，每步增加按组件的资源统计。
+
+**产出**：`TUTORIAL.md`，`experiment/STATES_AND_ACTIONS.md`，`GlobalAgent_prototype.md` v0.5。
+
+### 遗留事项
+
+| 事项 | 状态 |
+|---|---|
+| 三个补丁文件是否公开 | 已决定：不公开。只在本机，新机器上用 `scp` 复制 |
+| 原版基线、训练、评估 | 未开始，按 `TUTORIAL.md` 在至少 8 核 16GB 的机器上进行 |
+| 本机测试容器 | `neurdb-ga` 保留，服务已停止；`neurdb-p1` 已停止 |
+
+提交记录：neuragent 仓库 `ga-prototype` 分支，`8efd186`。
+
+---
+
 ## 2026-09-29（下午）
 
 ### 1. P1 验证：SELIX 通路能否在 NeurDB 内跑通
