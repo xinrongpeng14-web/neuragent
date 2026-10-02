@@ -10,6 +10,11 @@
 #   PG_EFFECTIVE_CACHE  effective_cache_size          default 8GB
 #   PG_MAX_CONNECTIONS  max_connections               default 100
 #   TORCH_INDEX         wheel index for CPU PyTorch   default https://download.pytorch.org/whl/cpu
+#   PIP_INDEX_URL       PyPI mirror                   default pip's own (https://pypi.org/simple)
+#
+# Offline sources: when /neuragent/deps/ holds the bundle made by deploy/fetch_deps.sh,
+# pg_hint_plan is built from deps/pg_hint_plan-PG16.tar.gz and the Python packages
+# are installed from deps/wheels/ without any network access.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -46,6 +51,7 @@ TORCH_INDEX=${TORCH_INDEX}
 EOT
 PG_HINT_PLAN_REPO=https://github.com/ossc-db/pg_hint_plan.git
 PG_HINT_PLAN_BRANCH=PG16
+DEPS=$ROOT/deps
 PG=$PREFIX/bin
 
 mkdir -p $BUILD
@@ -112,7 +118,14 @@ step engine build_engine
 # ---------------------------------------------------------------- 4. pg_hint_plan (PG16 branch)
 build_hint_plan() {
     rm -rf $BUILD/pg_hint_plan
-    git clone -q --depth 1 -b $PG_HINT_PLAN_BRANCH $PG_HINT_PLAN_REPO $BUILD/pg_hint_plan
+    if [ -f $DEPS/pg_hint_plan-PG16.tar.gz ]; then
+        echo "  from $DEPS/pg_hint_plan-PG16.tar.gz"
+        mkdir -p $BUILD/pg_hint_plan && tar -xzf $DEPS/pg_hint_plan-PG16.tar.gz -C $BUILD/pg_hint_plan --strip-components 1
+    else
+        git clone -q --depth 1 -b $PG_HINT_PLAN_BRANCH $PG_HINT_PLAN_REPO $BUILD/pg_hint_plan || {
+            echo "cannot reach GitHub; make the offline bundle with deploy/fetch_deps.sh on a machine" >&2
+            echo "that can, copy it to $DEPS, and run this script again" >&2; exit 1; }
+    fi
     cd $BUILD/pg_hint_plan
     make PG_CONFIG=$PG/pg_config > make.log 2>&1 || { tail -30 make.log; exit 1; }
     make PG_CONFIG=$PG/pg_config install > install.log 2>&1
@@ -134,10 +147,14 @@ step nr_molqo  build_extension nr_molqo
 # here; every pinned wheel exists for 3.10).
 build_venv() {
     rm -rf $VENV && python3 -m venv $VENV
-    $VENV/bin/pip install -q --no-cache-dir --upgrade pip wheel setuptools
-    $VENV/bin/pip install -q --no-cache-dir "psqlparse==1.0rc7"
-    $VENV/bin/pip install -q --no-cache-dir --extra-index-url "$TORCH_INDEX" \
-        -r $ROOT/deploy/requirements-container.txt
+    local src=(--extra-index-url "$TORCH_INDEX")
+    if [ -d $DEPS/wheels ]; then
+        echo "  from $DEPS/wheels (offline)"
+        src=(--no-index --find-links $DEPS/wheels)
+    fi
+    $VENV/bin/pip install -q --no-cache-dir "${src[@]}" --upgrade pip wheel setuptools
+    $VENV/bin/pip install -q --no-cache-dir "${src[@]}" "psqlparse==1.0rc7"
+    $VENV/bin/pip install -q --no-cache-dir "${src[@]}" -r $ROOT/deploy/requirements-container.txt
     $VENV/bin/python - <<'PY'
 import torch, psqlparse, pglast, sklearn, pandas, numpy, psycopg2, gymnasium, stable_baselines3
 print("  torch", torch.__version__, " numpy", numpy.__version__, " gymnasium", gymnasium.__version__,

@@ -10,6 +10,9 @@
 #   PARALLEL   tables loaded at the same time       default 4
 #   IMDB_DIR   where the archive is kept            default /data/imdb
 #
+# Offline sources: /neuragent/deps/imdb.tgz and /neuragent/deps/join-order-benchmark.tar.gz
+# (made by deploy/fetch_deps.sh) are used instead of downloading.
+#
 # Re-runnable: finished steps leave a stamp in /data/.stamps. Needs about 20 GB
 # in /data (archive 1.2 GB, CSV files 3.7 GB, database 9 GB).
 set -euo pipefail
@@ -48,6 +51,10 @@ download() {
     [ -f $IMDB_DIR/imdb.tgz ] && size=$(stat -c %s $IMDB_DIR/imdb.tgz)
     if [ "$size" -ge "$ARCHIVE_SIZE" ]; then
         echo "  archive already complete ($size bytes)"
+    elif [ -f $ROOT/deps/imdb.tgz ]; then
+        echo "  copying $ROOT/deps/imdb.tgz"
+        cp $ROOT/deps/imdb.tgz $IMDB_DIR/imdb.tgz
+        size=$(stat -c %s $IMDB_DIR/imdb.tgz)
     else
         curl -L --fail --retry 5 -C - -o $IMDB_DIR/imdb.tgz "$IMDB_URL"
         size=$(stat -c %s $IMDB_DIR/imdb.tgz)
@@ -112,7 +119,12 @@ extensions() {
 step imdb_extensions extensions
 
 job_queries() {
-    rm -rf /data/job && git clone -q --depth 1 "$JOB_REPO" /data/job
+    rm -rf /data/job
+    if [ -f $ROOT/deps/join-order-benchmark.tar.gz ]; then
+        mkdir -p /data/job && tar -xzf $ROOT/deps/join-order-benchmark.tar.gz -C /data/job --strip-components 1
+    else
+        git clone -q --depth 1 "$JOB_REPO" /data/job
+    fi
     local out=$ROOT/experiment/queries/job_all
     mkdir -p "$out" && rm -f "$out"/*.sql
     for f in /data/job/*.sql; do

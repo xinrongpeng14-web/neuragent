@@ -24,3 +24,6 @@ __pycache__/
 # (deploy/load_imdb.sh, experiment/pipeline.sh queries)
 /experiment/queries/job_all/
 /experiment/queries/job_fast/
+
+# Offline bundle made by deploy/fetch_deps.sh
+/deps/

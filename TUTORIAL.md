@@ -49,6 +49,31 @@ scripts/setup_neurdb.sh
 
 ---
 
+## 1a. 新机器的容器上不了外网时：离线依赖包
+
+建容器后，容器里要访问 GitHub（pg_hint_plan、JOB 查询）、PyPI 与 download.pytorch.org（Python 包）、event.cwi.nl（IMDB 数据）。如果新机器连不上其中任何一个（典型报错是 `Failed to connect to github.com port 443 ... Connection timed out`），就在能上网的机器（例如开发机）上做一个离线包，复制过去：
+
+```bash
+# 在开发机的 neuragent 目录里（已经做好的包就在 /home/zhanhao/neuragent/deps，可以直接复制）
+deploy/fetch_deps.sh
+
+# 在新机器的 neuragent 目录里
+scp -r "zhanhao@34.31.210.7:/home/zhanhao/neuragent/deps" .
+ls deps        # imdb.tgz  join-order-benchmark.tar.gz  pg_hint_plan-PG16.tar.gz  wheels/
+```
+
+`deps/` 约 1.5 GB，不入 git。有了它，`install_inside.sh` 从 `deps/` 编译 pg_hint_plan、从 `deps/wheels` 安装全部 Python 包，`load_imdb.sh` 从 `deps/` 取 IMDB 与 JOB 查询，都不再联网。容器只剩 apt 软件源需要联网（`packages` 这一步）。
+
+另外两种办法：主机上有代理时，建容器时传入 `https_proxy=...`（代理监听在主机 127.0.0.1 时再加 `NETWORK=host`）；只是 PyPI 慢时，传入 `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` 之类的镜像。
+
+**已经建好容器、中途失败时**：不要重建容器。把 `deps/` 放好后，直接重跑安装脚本，已完成的步骤会跳过：
+
+```bash
+docker exec neurdb-ga bash /neuragent/deploy/install_inside.sh
+```
+
+---
+
 ## 2. 建容器并编译
 
 ```bash
