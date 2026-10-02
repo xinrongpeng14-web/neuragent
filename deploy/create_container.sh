@@ -9,10 +9,7 @@
 #   MEMORY      memory limit                         default 16g
 #   DATA_VOLUME docker volume mounted at /data       default <NAME>-data
 #   IMAGE       base image                           default ubuntu:22.04
-#   NETWORK     docker network mode                  default bridge; "host" lets the
-#               container use a proxy that listens on the host's 127.0.0.1
-#   The variables of deploy/install_inside.sh (PG_SHARED_BUFFERS, JOBS, PIP_INDEX_URL, ...)
-#   and the proxy variables http_proxy / https_proxy / no_proxy are passed through.
+#   The variables of deploy/install_inside.sh (PG_SHARED_BUFFERS, JOBS, ...) are passed through.
 #
 # The project folder is mounted read-write at /neuragent, so the experiment
 # program runs inside the container and its outputs appear under experiment/runs/
@@ -25,7 +22,6 @@ CPUSET="${CPUSET:-}"
 MEMORY="${MEMORY:-16g}"
 DATA_VOLUME="${DATA_VOLUME:-${NAME}-data}"
 IMAGE="${IMAGE:-ubuntu:22.04}"
-NETWORK="${NETWORK:-}"
 
 if [ ! -f "$ROOT/NeuralDB/dbengine/configure" ]; then
     echo "NeuralDB/ is missing or incomplete; run scripts/setup_neurdb.sh first" >&2
@@ -44,15 +40,13 @@ fi
 docker volume create "$DATA_VOLUME" > /dev/null
 docker run -d --init --name "$NAME" \
     --cpus "$CPUS" ${CPUSET:+--cpuset-cpus "$CPUSET"} --memory "$MEMORY" --shm-size 1g \
-    ${NETWORK:+--network "$NETWORK"} \
     -v "$ROOT:/neuragent" -v "$DATA_VOLUME:/data" \
     "$IMAGE" sleep infinity > /dev/null
 echo "container $NAME created (cpus=$CPUS${CPUSET:+ cpuset=$CPUSET} memory=$MEMORY volume=$DATA_VOLUME)"
 
 # install_inside.sh reads its settings from the environment; pass the ones that are set
 pass=()
-for v in JOBS PG_SHARED_BUFFERS PG_WORK_MEM PG_EFFECTIVE_CACHE PG_MAX_CONNECTIONS TORCH_INDEX \
-         PIP_INDEX_URL http_proxy https_proxy no_proxy HTTP_PROXY HTTPS_PROXY NO_PROXY; do
+for v in JOBS PG_SHARED_BUFFERS PG_WORK_MEM PG_EFFECTIVE_CACHE PG_MAX_CONNECTIONS TORCH_INDEX; do
     [ -n "${!v:-}" ] && pass+=(-e "$v=${!v}")
 done
 docker exec "${pass[@]}" "$NAME" bash /neuragent/deploy/install_inside.sh
