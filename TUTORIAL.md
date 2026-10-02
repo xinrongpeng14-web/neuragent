@@ -31,12 +31,13 @@ git checkout ga-prototype
 对 NeurDB 的三个补丁文件**不在公开仓库里**（NeurDB 的许可证保留所有权利，见 `patches/neurdb/README.md`）。从开发机复制过来：
 
 ```bash
-# 在新机器上执行；<dev> 是开发机地址
-scp <dev>:/home/zhanhao/neuragent/patches/neurdb/0001-*.patch \
-    <dev>:/home/zhanhao/neuragent/patches/neurdb/0002-*.patch \
-    <dev>:/home/zhanhao/neuragent/patches/neurdb/0003-*.patch  patches/neurdb/
+# 在新机器的 neuragent 目录里执行。把 DEV 换成开发机的“用户名@地址”，不要加尖括号
+DEV=zhanhao@34.31.210.7
+scp "$DEV:/home/zhanhao/neuragent/patches/neurdb/*.patch" patches/neurdb/
 ls patches/neurdb/*.patch        # 应列出 3 个文件
 ```
+
+远程路径要放在引号里，`*` 才会由开发机展开。新机器需要能用 SSH 登录开发机；如果不能，就在开发机上反方向推送：`scp /home/zhanhao/neuragent/patches/neurdb/*.patch 用户名@新机器地址:<新机器上 neuragent 的路径>/patches/neurdb/`。
 
 然后取得上游 NeurDB 并打补丁（脚本会 clone 到 `NeuralDB/`、禁用对上游的 push、检出固定提交、初始化 SELIX 子模块、应用补丁）：
 
