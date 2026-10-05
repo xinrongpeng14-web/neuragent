@@ -1,0 +1,230 @@
+[
+ {
+  "query": "11c",
+  "runs": 2,
+  "off_cost": 5848.73,
+  "hint_cost": 7054.66,
+  "off_times": [
+   2.651717879343778,
+   1.0540149812586606
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   56.49881111877039,
+   1.9794306000694633
+  ],
+  "hint_status": "ok",
+  "off_s": 1.0540149812586606,
+  "hint_s": 1.9794306000694633,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "11d",
+  "runs": 2,
+  "off_cost": 5865.99,
+  "hint_cost": 7154.91,
+  "off_times": [
+   2.9842786518856883,
+   1.26677953498438
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   2.5166089041158557,
+   1.2768738269805908
+  ],
+  "hint_status": "ok",
+  "off_s": 1.26677953498438,
+  "hint_s": 1.2768738269805908,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "12b",
+  "runs": 2,
+  "off_cost": 66735.57,
+  "hint_cost": 84523.53,
+  "off_times": [
+   0.4994433466345072,
+   0.014610841870307922
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   15.940321404021233,
+   4.504232216160744
+  ],
+  "hint_status": "ok",
+  "off_s": 0.014610841870307922,
+  "hint_s": 4.504232216160744,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "24b",
+  "runs": 2,
+  "off_cost": 7285.59,
+  "hint_cost": 7600.18,
+  "off_times": [
+   3.4985231780447066,
+   0.5485455770976841
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   0.5058799330145121,
+   0.47647357918322086
+  ],
+  "hint_status": "ok",
+  "off_s": 0.5485455770976841,
+  "hint_s": 0.47647357918322086,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "27b",
+  "runs": 2,
+  "off_cost": 4065.37,
+  "hint_cost": 4154.97,
+  "off_times": [
+   1.20785988913849,
+   1.0302266580983996
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   18.00861139781773,
+   1.2727234698832035
+  ],
+  "hint_status": "ok",
+  "off_s": 1.0302266580983996,
+  "hint_s": 1.2727234698832035,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "27c",
+  "runs": 2,
+  "off_cost": 4065.4,
+  "hint_cost": 4065.41,
+  "off_times": [
+   1.8028084617108107,
+   1.7628824603743851
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   1.7320645111612976,
+   4.51467157015577
+  ],
+  "hint_status": "ok",
+  "off_s": 1.7628824603743851,
+  "hint_s": 1.7320645111612976,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_indexscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "31b",
+  "runs": 2,
+  "off_cost": 12939.85,
+  "hint_cost": 13174.28,
+  "off_times": [
+   60.0,
+   21.006284780800343
+  ],
+  "off_status": "timeout",
+  "hint_times": [
+   32.23505144286901,
+   7.49845605622977
+  ],
+  "hint_status": "ok",
+  "off_s": 21.006284780800343,
+  "hint_s": 7.49845605622977,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "32a",
+  "runs": 2,
+  "off_cost": 3879.15,
+  "hint_cost": 4072.26,
+  "off_times": [
+   0.05399656714871526,
+   0.06014200299978256
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   0.18695217091590166,
+   0.20923827402293682
+  ],
+  "hint_status": "ok",
+  "off_s": 0.05399656714871526,
+  "hint_s": 0.18695217091590166,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "32b",
+  "runs": 2,
+  "off_cost": 3879.15,
+  "hint_cost": 4072.26,
+  "off_times": [
+   12.948997646104544,
+   0.4636287773028016
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   1.0932792341336608,
+   1.1841415236704051
+  ],
+  "hint_status": "ok",
+  "off_s": 0.4636287773028016,
+  "hint_s": 1.0932792341336608,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "33a",
+  "runs": 2,
+  "off_cost": 3783.55,
+  "hint_cost": 12331.14,
+  "off_times": [
+   3.695549631025642,
+   1.042561826761812
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   0.7075312132947147,
+   0.535314614418894
+  ],
+  "hint_status": "ok",
+  "off_s": 1.042561826761812,
+  "hint_s": 0.535314614418894,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_indexscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "4a",
+  "runs": 2,
+  "off_cost": 16533.25,
+  "hint_cost": 18301.45,
+  "off_times": [
+   6.74400769174099,
+   1.1653107577003539
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   3.016482005827129,
+   1.3190080542117357
+  ],
+  "hint_status": "ok",
+  "off_s": 1.1653107577003539,
+  "hint_s": 1.3190080542117357,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ },
+ {
+  "query": "4c",
+  "runs": 2,
+  "off_cost": 16542.63,
+  "hint_cost": 18322.84,
+  "off_times": [
+   1.239145901054144,
+   1.0031671072356403
+  ],
+  "off_status": "ok",
+  "hint_times": [
+   1.0041091199964285,
+   1.271040413994342
+  ],
+  "hint_status": "ok",
+  "off_s": 1.0031671072356403,
+  "hint_s": 1.0041091199964285,
+  "hint_action": "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_mergejoin TO off;\nSET enable_seqscan TO off;\nSET enable_indexscan TO off;\nSET enable_indexonlyscan TO off;\nSET enable_hashjoin TO on;\nSET enable_indexonlyscan TO on;\nSET enable_nestloop TO on;\nSET enable_seqscan TO on;"
+ }
+]

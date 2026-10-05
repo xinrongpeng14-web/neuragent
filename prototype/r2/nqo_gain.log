@@ -1,0 +1,14 @@
+11c    off 1.05s/ok/cost 5849  hint 1.98s/ok/cost 7055
+11d    off 1.27s/ok/cost 5866  hint 1.28s/ok/cost 7155
+12b    off 0.01s/ok/cost 66736  hint 4.5s/ok/cost 84524
+24b    off 0.55s/ok/cost 7286  hint 0.48s/ok/cost 7600
+27b    off 1.03s/ok/cost 4065  hint 1.27s/ok/cost 4155
+27c    off 1.76s/ok/cost 4065  hint 1.73s/ok/cost 4065
+31b    off 21.01s/timeout/cost 12940  hint 7.5s/ok/cost 13174
+32a    off 0.05s/ok/cost 3879  hint 0.19s/ok/cost 4072
+32b    off 0.46s/ok/cost 3879  hint 1.09s/ok/cost 4072
+33a    off 1.04s/ok/cost 3784  hint 0.54s/ok/cost 12331
+4a     off 1.17s/ok/cost 16533  hint 1.32s/ok/cost 18301
+4c     off 1.0s/ok/cost 16543  hint 1.0s/ok/cost 18323
+12 queries compared; written to /neuragent/prototype/r2/nqo_gain.json
+exit=0
