@@ -43,21 +43,43 @@ def main(argv=None):
     def membership(q):
         return [name for name, (names, _) in sets.items() if q in names]
 
+    def baseline_of(q):
+        """Cost-based latency of a query that the gain run did not execute: from the set's latencies.json."""
+        for names, lat in sets.values():
+            if q in names and lat.get(q, {}).get("best_s") is not None:
+                return lat[q]["best_s"]
+        return None
+
+    # inference time of the unchanged queries was not recorded by older gain runs: use the median
+    recorded = sorted(e["opt_ms"] for r in rows for e in r["experts"].values() if e.get("opt_ms"))
+    typical_ms = recorded[len(recorded) // 2] if recorded else 0.0
+
     per_q = []
+    n_from_baseline = 0
     for r in rows:
         e = r["experts"].get(args.expert)
         off = r.get("off_s")
-        if off is None:
-            continue
         if e is None:                       # expert leaves the plan: only the inference is paid
-            exp_s, status, opt = off, "unchanged", None
+            if off is None:
+                off = baseline_of(r["query"])
+                if off is None:
+                    continue
+                n_from_baseline += 1
+            opt = (r.get("inference_ms") or {}).get(args.expert, typical_ms)
+            exp_s, status = off, "unchanged"
         else:
+            if off is None:
+                continue
             exp_s, status, opt = e.get("s"), e.get("status"), e.get("opt_ms")
         if exp_s is None:
             continue
         per_q.append({"q": r["query"], "off": off, "exp": exp_s, "opt_s": (opt or 0.0) / 1000.0,
                       "status": status, "off_status": r.get("off_status", "ok"),
                       "sets": membership(r["query"]) or ["(not in a set)"]})
+    if n_from_baseline:
+        print(f"({n_from_baseline} queries the experts leave unchanged were not executed by the gain run; "
+              f"their cost-based time is taken from latencies.json and their inference time is the median "
+              f"{typical_ms:.0f} ms)")
 
     def summarize(items, title):
         if not items:

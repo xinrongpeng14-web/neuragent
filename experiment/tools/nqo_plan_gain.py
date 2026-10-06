@@ -165,13 +165,14 @@ def main(argv=None):
     for path in files:
         q = os.path.splitext(os.path.basename(path))[0]
         sql = open(path, encoding="utf-8").read().strip()
-        rec = {"query": q, "experts": {}}
+        rec = {"query": q, "experts": {}, "inference_ms": {}}
         for flt in filters:
             try:
                 prefix, expert, opt_ms = ask_nqo(url, sql, flt)
             except Exception as e:
                 print(f"  {q:5s} {flt}: NQO service error: {e}", flush=True)
                 continue
+            rec["inference_ms"][flt] = opt_ms      # paid whether or not the plan changes
             if prefix:
                 rec["experts"][flt] = {"expert": expert, "action": prefix, "label": arm_label(prefix),
                                        "opt_ms": opt_ms, "stmts": variant_statements(sql, flt, prefix)}
