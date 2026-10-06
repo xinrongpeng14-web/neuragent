@@ -67,13 +67,23 @@ docker exec neurdb-ga bash /neuragent/experiment/pipeline.sh gain
 
 结果：`experiment/runs/imdb_r2/nqo_gain.md`（表格）、`nqo_gain.json`、`nqo_gain_wins.txt`（专家计划快 20% 以上的查询）。最后三行打印总结。
 
-**怎么读**：
+**怎么读。** 单条查询的倍数不能直接相加：一条 60 秒的查询快 50 倍能省 59 秒，二十条 3 秒的查询各慢 50% 一共只多花 30 秒。所以要看每个查询集上一遍的总秒数，`gain` 阶段结束时自动打印（也可以单独执行 `pipeline.sh gain_summary`）：
 
-| 结果 | 含义 | 下一步 |
+```
+set job_long: 30 queries
+  one pass, cost-based plans:      280.0 s
+  one pass, expert plans:          240.0 s  (-14.3%)
+  + inference once per query:      255.0 s  (-8.9%)      <- 这一行是 hint 模式在阶段 A 的净效果
+expert wins (>= 20% faster): 3; of these 1 have a cost-based baseline above LONG_MAX=40 s ...
+  to include them: LONG_MAX >= 95 and job.statement_timeout_ms >= 237500
+```
+
+| `job_long` 上“含推理”的那一行 | 含义 | 下一步 |
 |---|---|---|
-| 长查询里有若干条专家计划快 20% 以上，且慢 25% 以上的不多 | NQO 在长查询上有收益可争取 | 继续第 4 步 |
-| 专家计划明显更快的只有零星几条，明显更慢的更多 | 这台机器、这套预训练模型下 NQO 没有可协调的收益 | 看 `GlobalAgent_round2.md` 2.4 节；可试 `NQO_CACHE=1` 去掉重复推理后再评估，或停止 NQO 一侧 |
-| JoinOrder 一条提示都不给 | 预期现象（KNN 门槛依赖原作者机器的延迟记录） | hint 模式仍可能有收益，不影响继续 |
+| 为负（专家更快） | 阶段 A 里 hint 模式有净收益，而快查询集上通常为正（净亏），两个阶段的最优动作相反 | 继续第 4 步 |
+| 为正，但 `expert wins` 里有基线超过 LONG_MAX 的查询 | 收益集中在被截掉的最慢查询上，这正是 Bao 原文的收益模式 | 按打印的建议提高 `LONG_MAX`，把 `experiment/config/imdb_r2.json` 里 `job.statement_timeout_ms` 调到建议值，重跑 `queries` 与 `gain_summary`（不必重跑 `gain`） |
+| 为正，且没有被截掉的赢家 | 这台机器、这套预训练模型下 NQO 在任何阶段都是净亏，没有可协调的收益 | 见 `GlobalAgent_round2.md` 2.4 节的三个选项；先试 `NQO_CACHE=1` 消掉重复推理再看“不含推理”那一行是否为负 |
+| JoinOrder 一条提示都不给 | 预期现象（KNN 门槛依赖原作者机器的延迟记录） | 不影响继续 |
 
 开发机上的结果（1.5 核、磁盘受限，只测了 12 条快查询）见 `GlobalAgent_round2.md` 2.3 节。
 

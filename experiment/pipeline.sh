@@ -8,6 +8,7 @@
 #   queries     split the JOB queries by baseline latency into the fast set (<= THRESHOLD s)
 #               and the long set (THRESHOLD .. LONG_MAX s)
 #   gain        calibration 1: time every expert plan against the cost-based plan
+#   gain_summary  sum the expert's effect per query set (printed by gain as well)
 #   memcal      calibration 2: JOB throughput with a small and a large SELIX index
 #   seed        create the YCSB seed table
 #   baseline    original system (NQO auto, SELIX default): reference values for the reward
@@ -94,7 +95,11 @@ run_stage() {
     gain)
         log "calibration 1: expert plans vs cost-based plans, $GAIN_RUNS runs, timeout $GAIN_TIMEOUT s"
         $PY tools/nqo_plan_gain.py --config "$CONFIG" --query-dir queries/job_all \
-            --out "$LOG_DIR/${RUN_PREFIX}nqo_gain" --runs "$GAIN_RUNS" --timeout "$GAIN_TIMEOUT" "$@" ;;
+            --out "$LOG_DIR/${RUN_PREFIX}nqo_gain" --runs "$GAIN_RUNS" --timeout "$GAIN_TIMEOUT" "$@"
+        $PY tools/nqo_gain_summary.py --gain "$LOG_DIR/${RUN_PREFIX}nqo_gain.json" --sets "$FAST_DIR,$LONG_DIR" --max-long "$LONG_MAX" ;;
+    gain_summary)
+        log "net effect of the expert plans per query set"
+        $PY tools/nqo_gain_summary.py --gain "$LOG_DIR/${RUN_PREFIX}nqo_gain.json" --sets "$FAST_DIR,$LONG_DIR" --max-long "$LONG_MAX" "$@" ;;
     memcal)
         log "calibration 2: JOB throughput with index sizes $MEMCAL_KEYS, $MEMCAL_STEPS steps each"
         $PY tools/mem_coupling.py --config "$CONFIG" --keys "$MEMCAL_KEYS" --steps "$MEMCAL_STEPS" "$@" ;;
