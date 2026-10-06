@@ -99,10 +99,11 @@ class _Client(threading.Thread):
 
 
 class _Pool:
-    def __init__(self, db_cfg: DbConfig, cfg: JobConfig, queries: List[Query]):
+    def __init__(self, db_cfg: DbConfig, cfg: JobConfig, query_sets: Dict[str, List[Query]]):
         self.db_cfg = db_cfg
         self.cfg = cfg
-        self.queries = queries
+        self.query_sets = query_sets
+        self.queries = next(iter(query_sets.values()))
         self.cond = threading.Condition()
         self.lock = threading.Lock()
         self.running = False
@@ -144,6 +145,16 @@ class _Pool:
             self.active = n
             self.cond.notify_all()
 
+    def set_query_set(self, name: str) -> None:
+        """Switch to another query set; clients pick it up with their next query."""
+        with self.cond:
+            if name not in self.query_sets:
+                raise KeyError(f"unknown query set {name!r}")
+            if self.query_sets[name] is not self.queries:
+                self.queries = self.query_sets[name]
+                self.epoch += 1          # clients reshuffle over the new set
+            self.cond.notify_all()
+
     def stop(self, wait_s: float = 10.0) -> None:
         with self.cond:
             self.running = False
@@ -171,20 +182,25 @@ class _Pool:
             c.join(timeout=2)
 
 
-def _main(pipe, db_cfg: DbConfig, cfg: JobConfig, queries: List[Query]) -> None:
+def _main(pipe, db_cfg: DbConfig, cfg: JobConfig, query_sets: Dict[str, List[Query]]) -> None:
     import signal
 
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-    pool = _Pool(db_cfg, cfg, queries)
+    pool = _Pool(db_cfg, cfg, query_sets)
     while True:
         msg = pipe.recv()
         cmd = msg["cmd"]
         try:
             if cmd == "start":
+                if msg.get("query_set"):
+                    pool.set_query_set(msg["query_set"])
                 pool.start(msg["episode_seed"], msg["clients"])
                 reply: Dict[str, Any] = {"ok": True}
             elif cmd == "clients":
                 pool.set_clients(msg["n"])
+                reply = {"ok": True}
+            elif cmd == "query_set":
+                pool.set_query_set(msg["name"])
                 reply = {"ok": True}
             elif cmd == "snapshot":
                 reply = {"ok": True, **pool.snapshot()}
@@ -205,11 +221,15 @@ def _main(pipe, db_cfg: DbConfig, cfg: JobConfig, queries: List[Query]) -> None:
 class JobDriver:
     """Handle of the driver process, used by the environment."""
 
-    def __init__(self, db_cfg: DbConfig, cfg: JobConfig, queries: List[Query],
+    def __init__(self, db_cfg: DbConfig, cfg: JobConfig, queries,
                  reply_timeout_s: float = 60.0):
+        """queries: a list of (template, sql), or a dict name -> list for several query sets."""
+        query_sets = queries if isinstance(queries, dict) else {"default": list(queries)}
+        if not query_sets:
+            raise ValueError("at least one query set is required")
         ctx = mp.get_context("spawn")
         self.pipe, child = ctx.Pipe()
-        self.proc = ctx.Process(target=_main, args=(child, db_cfg, cfg, queries), daemon=True)
+        self.proc = ctx.Process(target=_main, args=(child, db_cfg, cfg, query_sets), daemon=True)
         self.proc.start()
         child.close()
         self.reply_timeout_s = reply_timeout_s
@@ -223,11 +243,14 @@ class JobDriver:
             raise RuntimeError(f"JOB driver: {reply.get('error')}")
         return reply
 
-    def start(self, episode_seed: int, clients: int) -> None:
-        self._call(cmd="start", episode_seed=int(episode_seed), clients=int(clients))
+    def start(self, episode_seed: int, clients: int, query_set: Optional[str] = None) -> None:
+        self._call(cmd="start", episode_seed=int(episode_seed), clients=int(clients), query_set=query_set)
 
     def set_clients(self, n: int) -> None:
         self._call(cmd="clients", n=int(n))
+
+    def set_query_set(self, name: str) -> None:
+        self._call(cmd="query_set", name=name)
 
     def snapshot(self) -> Dict[str, Any]:
         return self._call(cmd="snapshot")

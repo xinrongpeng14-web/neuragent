@@ -70,6 +70,8 @@ class PhaseConfig:
     ycsb_read_ratio: float = 0.9
     # operations per second; 0 means unlimited
     ycsb_rate: float = 2000.0
+    # directory with this phase's JOB queries; empty = job.query_dir
+    query_dir: str = ""
 
 
 @dataclass
@@ -107,6 +109,15 @@ class Config:
     @property
     def episode_steps(self) -> int:
         return sum(p.steps for p in self.phases)
+
+    def query_dirs(self) -> List[str]:
+        """Distinct query directories used by the phases, in order of first use."""
+        out: List[str] = []
+        for p in self.phases:
+            d = p.query_dir or self.job.query_dir
+            if d not in out:
+                out.append(d)
+        return out
 
     def phase_of_step(self, step: int) -> int:
         """Index of the phase that step (0-based, within the episode) belongs to."""

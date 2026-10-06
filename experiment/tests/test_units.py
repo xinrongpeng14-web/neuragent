@@ -269,7 +269,7 @@ class MetricsTest(unittest.TestCase):
     def test_observation(self):
         m = metrics(cpu_util=0.5, idx_gets=1, idx_puts=1, idx_smo=1, idx_sampled=1, idx_sampled_ns=800,
                     idx_mem_bytes=100, job_lat_sum_s=1.0, ycsb_lat_sum_s=1.0)
-        obs = M.observation(m, REFS, "A", 0, "join", "sparse")
+        obs = M.observation(m, REFS, "A", 0, "join", "default")
         self.assertEqual(obs.shape, (M.OBS_DIM,))
         self.assertEqual(obs.dtype, np.float32)
         self.assertEqual(len(M.OBS_NAMES), M.OBS_DIM)

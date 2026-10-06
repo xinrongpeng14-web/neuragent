@@ -59,7 +59,9 @@ class GaEnv(gym.Env):
         self.procs = (ProcSampler(lambda: self.admin.fetchall(PG_ACTIVITY_SQL))
                       if cfg.container.proc_stats and not cfg.container.name else None)
         self.ycsb = YcsbDriver(cfg.db, cfg.ycsb, load_lookup_keys(self.admin, cfg.ycsb))
-        self.job = JobDriver(cfg.db, cfg.job, load_queries(cfg.job.query_dir))
+        # one query set per distinct directory; phases may use different sets
+        self.query_sets = {d: load_queries(d) for d in cfg.query_dirs()}
+        self.job = JobDriver(cfg.db, cfg.job, self.query_sets)
 
         self.episode = -1
         self.step_idx = 0
@@ -84,6 +86,7 @@ class GaEnv(gym.Env):
         phase = self.cfg.phases[idx]
         if idx != self.phase_idx:
             self.ycsb.set_phase(phase.ycsb_read_ratio, phase.ycsb_rate)
+            self.job.set_query_set(phase.query_dir or self.cfg.job.query_dir)
             self.job.set_clients(phase.job_clients)
             self.phase_idx = idx
         return phase.name
@@ -167,7 +170,8 @@ class GaEnv(gym.Env):
         self.step_idx = 0
         self.phase_idx = -1
         phase = self._apply_phase(0)
-        self.job.start(episode_seed, self.cfg.phases[0].job_clients)
+        self.job.start(episode_seed, self.cfg.phases[0].job_clients,
+                       self.cfg.phases[0].query_dir or self.cfg.job.query_dir)
 
         m = M.StepMetrics()
         for _ in range(max(1, self.cfg.warmup_steps)):

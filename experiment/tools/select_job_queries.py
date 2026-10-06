@@ -1,13 +1,15 @@
-"""Pick the JOB queries that the original system finishes quickly.
+"""Split the JOB queries by how long the original system takes for them.
 
 Every query of --job-dir is run on the database with NQO switched off (the
 cost-based optimizer), --runs times; the fastest run counts. Queries at or
-below --threshold seconds are copied to --out, which becomes job.query_dir of
-the experiment config. All latencies go to <out>/latencies.json.
+below --threshold seconds are copied to --out (the "fast" set); with
+--out-long, queries above the threshold that still finish within --long-max
+seconds are copied there (the "long" set). Latencies go to <out>/latencies.json
+and <out-long>/latencies.json.
 
 Usage (inside the container, in experiment/):
-  python tools/select_job_queries.py --config config/imdb.json --job-dir queries/job_all \\
-      --out queries/job_fast --threshold 1.0
+  python tools/select_job_queries.py --config config/imdb_r2.json --job-dir queries/job_all \\
+      --out queries/job_fast --threshold 1.0 --out-long queries/job_long --long-max 40
 """
 from __future__ import annotations
 
@@ -33,6 +35,9 @@ def main(argv=None) -> int:
     ap.add_argument("--job-dir", default="queries/job_all")
     ap.add_argument("--out", default="queries/job_fast")
     ap.add_argument("--threshold", type=float, default=1.0, help="seconds")
+    ap.add_argument("--out-long", default="", help="directory for the queries above the threshold")
+    ap.add_argument("--long-max", type=float, default=40.0,
+                    help="longest baseline (seconds) admitted to the long set")
     ap.add_argument("--runs", type=int, default=2, help="runs per query; the fastest counts")
     ap.add_argument("--timeout", type=float, default=0.0,
                     help="statement timeout in seconds (default: 10 x threshold)")
@@ -45,7 +50,7 @@ def main(argv=None) -> int:
     if not files:
         print(f"no *.sql files in {args.job_dir}", file=sys.stderr)
         return 1
-    timeout_s = args.timeout or 10 * args.threshold
+    timeout_s = args.timeout or (1.5 * args.long_max if args.out_long else 10 * args.threshold)
     conn = connect(cfg.db, "ga_tool", molqo_off=True)
     cur = conn.cursor()
     cur.execute(f"SET statement_timeout = {int(timeout_s * 1000)}")
@@ -93,6 +98,20 @@ def main(argv=None) -> int:
     total = sum(results[n]["best_s"] for n in fast)
     print(f"\n{len(fast)} of {len(files)} queries at or below {args.threshold} s, copied to {args.out}; "
           f"one pass over them takes {total:.1f} s on one client")
+    if args.out_long:
+        long_q = sorted(n for n, r in results.items()
+                        if r["best_s"] is not None and args.threshold < r["best_s"] <= args.long_max)
+        os.makedirs(args.out_long, exist_ok=True)
+        for old in glob.glob(os.path.join(args.out_long, "*.sql")):
+            os.remove(old)
+        for name in long_q:
+            shutil.copy(os.path.join(args.job_dir, name + ".sql"), os.path.join(args.out_long, name + ".sql"))
+        with open(os.path.join(args.out_long, "latencies.json"), "w", encoding="utf-8") as f:
+            json.dump({"threshold_s": args.threshold, "long_max_s": args.long_max, "selected": long_q,
+                       "results": {n: results[n] for n in long_q}}, f, indent=2)
+        total_long = sum(results[n]["best_s"] for n in long_q)
+        print(f"{len(long_q)} queries between {args.threshold} and {args.long_max} s, copied to {args.out_long}; "
+              f"one pass over them takes {total_long:.1f} s on one client")
     if len(fast) < args.min_queries:
         print(f"warning: fewer than {args.min_queries} queries; raise --threshold or check the machine",
               file=sys.stderr)

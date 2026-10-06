@@ -10,7 +10,8 @@
 | `GlobalAgent_design.md` | 完整方案，v0.3 已按实测结果修订 |
 | `GlobalAgent_prototype.md` | 雏形方案：用一次对比实验判断可行性 |
 | `GlobalAgent_round2.md` | 第一轮实验结果分析（NQO 为何净负收益、SELIX 档位为何无差别）与第二轮方案 |
-| `TUTORIAL.md` | 操作教程：在另一台机器上从建容器到跑完对比实验 |
+| `TUTORIAL.md` | 操作教程（第一轮）：在另一台机器上从建容器到跑完对比实验 |
+| `TUTORIAL_round2.md` | 操作教程（第二轮）：在已有容器上做两项校准并跑完第二轮实验 |
 | `NeuralDB_code_analysis.md` | NeurDB 代码分析，重点是 NQO 与 SELIX |
 | `CHMAS_paper_vs_code.md` | CHMAS 论文与其代码的对照 |
 | `experiment/` | 实验程序：负载驱动、指标采集、Gym 环境、训练、评估、报告；`STATES_AND_ACTIONS.md` 枚举各组件的状态与动作 |
@@ -40,4 +41,4 @@
 | 完整方案按实测结果修订 | 完成 |
 | 训练、评估、报告脚本；部署脚本与操作教程 | 完成 |
 | 第一轮：原版基线、训练、评估 | 完成（2026-10-04，4 核 16 GB）。GA 学到“关 NQO”，协调收益为零，分析见 `GlobalAgent_round2.md` |
-| 第二轮：重新设计负载与对照臂 | 方案已写（`GlobalAgent_round2.md` 第 4 节），待实验机上的两项校准后实施 |
+| 第二轮：重新设计负载与对照臂 | 前置工作完成（2026-10-06）：按阶段切换查询集、新档位、校准工具、新对照臂、NQO 决策缓存选项；步骤见 `TUTORIAL_round2.md` |

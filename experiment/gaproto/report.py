@@ -331,7 +331,7 @@ def render(arms: Dict[str, Dict[str, Any]], arm_records: Dict[str, List[Record]]
                          pct(s["idx_mem_end_mb"], ref["idx_mem_end_mb"]),
                          pct(s["cores"]["total"], ref["cores"]["total"]), d_reward])
         L.append(table(["臂", "q_J", "JOB p99", "YCSB ops/s", "c_idx", "索引内存", "总 CPU", "综合回报差"], rows))
-        L.append("\n正方向为好的指标：q_J、YCSB ops/s、综合回报差。负方向为好的指标：JOB p99、c_idx、索引内存、总 CPU。\n")
+        L.append(f"\n百分比相对于 `{reference}`。正方向为好的指标：q_J、YCSB ops/s、综合回报差。负方向为好的指标：JOB p99、c_idx、索引内存、总 CPU。\n")
 
     # ---- 2. resources
     L.append("## 2. 资源：每个臂各组件占用的 CPU 与内存\n")
@@ -449,29 +449,41 @@ def render(arms: Dict[str, Dict[str, Any]], arm_records: Dict[str, List[Record]]
 
     # ---- 5. verdict
     ga = next((a for a in arm_order if a.startswith("ga")), None)
+    static = "static-best" if "static-best" in arms else None
     orig = next((a for a in ("nqo", "original") if a in arms), None)
-    if ga and orig and refs is not None:
-        L.append("## 5. 按雏形文档 7.5 节的判定\n")
-        g, o = arms[ga]["phases"]["all"], arms[orig]["phases"]["all"]
-        d = (g["r_total"][0] or 0) - (o["r_total"][0] or 0)
-        p99 = pct(g["job_p99_s"], o["job_p99_s"])
-        ycsb = pct(g["ycsb_ops_per_s"], o["ycsb_ops_per_s"])
-        harness = g["cores"]["harness"][0] or 0.0
-        total = g["cores"]["total"][0] or 1.0
-        per_ep_g, per_ep_o = g["r_total_per_episode"], o["r_total_per_episode"]
-        consistent = (len(per_ep_g) == len(per_ep_o) and len(per_ep_g) > 0 and
-                      all((x or 0) > (y or 0) for x, y in zip(per_ep_g, per_ep_o)))
-        rows = [
-            ["综合回报 GA − 原版（对数尺度，+0.05 ≈ 5%）", f"{d:+.3f}", "≥ +0.05" , "是" if d >= 0.05 else "否"],
-            ["逐回合方向一致", "是" if consistent else "否", "是", "是" if consistent else "否"],
-            ["JOB p99 变化", p99, "≤ +10%", "是" if p99 != "–" and float(p99.rstrip("%")) <= 10 else "否"],
-            ["YCSB 吞吐变化", ycsb, "≥ −5%", "是" if ycsb != "–" and float(ycsb.rstrip("%")) >= -5 else "否"],
-            ["GA 推理与指标采集（harness 组）占总 CPU", f"{harness / total * 100:.1f}%", "< 2%",
-             "是" if harness / total < 0.02 else "否"],
-        ]
-        L.append(table(["条件", "测得", "门槛", "满足"], rows))
-        L.append("\n门槛是雏形阶段的经验取值。四项都满足记为“可行”；回报为正但不足 5% 记为“有潜力但需调整”；"
-                 "回报不优于原版时，看第 4 节的阶段×动作表区分“学习失败”与“当前条件下不可行”。\n")
+    if ga and refs is not None and (static or orig):
+        L.append("## 5. 判定\n")
+        g = arms[ga]["phases"]["all"]
+
+        def compare(ref_name, title):
+            o = arms[ref_name]["phases"]["all"]
+            d = (g["r_total"][0] or 0) - (o["r_total"][0] or 0)
+            p99 = pct(g["job_p99_s"], o["job_p99_s"])
+            ycsb = pct(g["ycsb_ops_per_s"], o["ycsb_ops_per_s"])
+            harness = g["cores"]["harness"][0] or 0.0
+            total = g["cores"]["total"][0] or 1.0
+            per_ep_g, per_ep_o = g["r_total_per_episode"], o["r_total_per_episode"]
+            consistent = (len(per_ep_g) == len(per_ep_o) and len(per_ep_g) > 0 and
+                          all((x or 0) > (y or 0) for x, y in zip(per_ep_g, per_ep_o)))
+            rows = [
+                [f"综合回报 GA − {ref_name}（对数尺度，+0.05 ≈ 5%）", f"{d:+.3f}", "≥ +0.05", "是" if d >= 0.05 else "否"],
+                ["逐回合方向一致", "是" if consistent else "否", "是", "是" if consistent else "否"],
+                ["JOB p99 变化", p99, "≤ +10%", "是" if p99 != "–" and float(p99.rstrip("%")) <= 10 else "否"],
+                ["YCSB 吞吐变化", ycsb, "≥ −5%", "是" if ycsb != "–" and float(ycsb.rstrip("%")) >= -5 else "否"],
+                ["GA 推理与指标采集（harness 组）占总 CPU", f"{harness / total * 100:.1f}%", "< 2%",
+                 "是" if harness / total < 0.02 else "否"],
+            ]
+            L.append(f"### {title}\n")
+            L.append(table(["条件", "测得", "门槛", "满足"], rows))
+            L.append("")
+
+        if static:
+            compare(static, f"5.1 协调收益：`{ga}` 相对各组件静态最优的组合 `static-best`")
+            L.append("这是第二轮的主判定量。`static-best` 是两个组件各自扫描出的最优固定配置的组合；GA 只有在不同阶段选择不同动作才可能超过它。"
+                     "若训练日志的阶段×动作表（第 4 节）显示某一个固定动作在所有阶段都最优，则协调没有价值，GA 至多等于 `static-best`。\n")
+        if orig:
+            compare(orig, f"5.{2 if static else 1} 相对原版 NeurDB：`{ga}` 相对 `{orig}`（第一轮的判定量）")
+        L.append("门槛是雏形阶段的经验取值。回报不优于对照时，看第 4 节的阶段×动作表区分“学习失败”与“当前条件下不可行”。\n")
     return "\n".join(L)
 
 

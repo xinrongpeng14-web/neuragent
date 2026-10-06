@@ -46,7 +46,7 @@ def main():
             check_observation_space(env.observation_space)
             check_action_space(env.action_space)
             env_reset_passive_checker(env, seed=args.seed)
-            for action in (A.ORIGINAL_ACTION, A.encode("off", "sparse")):
+            for action in (A.ORIGINAL_ACTION, A.encode("off", "mid")):
                 env_step_passive_checker(env, action)
             check("spaces, reset() and step() follow the gymnasium interface", True)
         except Exception as e:
@@ -74,7 +74,7 @@ def main():
               (env.nqo_mode, env.selix_preset) == A.decode(A.ORIGINAL_ACTION))
 
         # visit every NQO mode and every preset at least once
-        plan = [A.encode("off", "dense"), A.encode("hint", "sparse"), A.encode("join", "default")]
+        plan = [A.encode("off", "dense"), A.encode("hint", "mid"), A.encode("join", "default")]
         plan += [int(a) for a in rng.integers(0, A.NUM_ACTIONS, cfg.episode_steps)]
         total, done, step = 0.0, False, 0
         while not done:

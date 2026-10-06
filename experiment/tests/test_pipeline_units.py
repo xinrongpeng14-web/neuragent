@@ -109,7 +109,7 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(t.act(None, "B"), A.encode("auto", "default"))
         with self.assertRaises(KeyError):
             t.act(None, "C")
-        self.assertEqual(parse_action(" hint / sparse "), A.encode("hint", "sparse"))
+        self.assertEqual(parse_action(" hint / mid "), A.encode("hint", "mid"))
         for bad in ("fixed:", "fixed:off", "fixed:up/down", "table:A", "nonsense"):
             with self.assertRaises(ValueError, msg=bad):
                 make_policy(bad)
@@ -219,7 +219,7 @@ class ReportTest(unittest.TestCase):
             with open(out, encoding="utf-8") as f:
                 text = f.read()
             self.assertIn("## 1. 收益", text)
-            self.assertIn("## 5. 按雏形文档 7.5 节的判定", text)
+            self.assertIn("## 5. 判定", text)
             self.assertIn("off/dense", text)
             with open(js, encoding="utf-8") as f:
                 summary = json.load(f)
@@ -241,3 +241,41 @@ class ReportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)
+
+
+class Round2Test(unittest.TestCase):
+    def test_phase_query_dirs(self):
+        from gaproto.config import load_config
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "c.json")
+            with open(path, "w") as f:
+                json.dump({"job": {"query_dir": "q/fast"},
+                           "phases": [{"name": "A", "steps": 2, "job_clients": 2, "query_dir": "q/long"},
+                                      {"name": "B", "steps": 2, "job_clients": 4},
+                                      {"name": "C", "steps": 1, "job_clients": 1, "query_dir": "q/long"}]}, f)
+            cfg = load_config(path)
+        self.assertEqual(cfg.query_dirs(), ["q/long", "q/fast"])
+        self.assertEqual(cfg.phases[1].query_dir, "")
+
+    def test_presets(self):
+        self.assertEqual(tuple(A.SELIX_PRESETS), ("dense", "mid", "default"))
+        self.assertEqual(A.decode(A.ORIGINAL_ACTION), ("auto", "default"))
+        for name, (i, x, n) in A.SELIX_PRESETS.items():
+            self.assertTrue(0 < n < i < x <= 1, name)
+
+    def test_plan_gain_helpers(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+        import nqo_plan_gain as G
+        prefix = "SET enable_nestloop TO off;\nSET enable_hashjoin TO off;\nSET enable_hashjoin TO on;"
+        self.assertEqual(G.arm_label(prefix), "off: nestloop")
+        stmts = G.variant_statements("SELECT 1", "hint", prefix)
+        self.assertEqual(stmts[-1], "SELECT 1")
+        self.assertTrue(all(s.startswith("SET LOCAL ") for s in stmts[:-1]))
+        self.assertEqual(G.variant_statements("SELECT 1", "join", "/*+Leading(a b)*/"), ["/*+Leading(a b)*/ SELECT 1"])
+        results = [{"query": "1a", "experts": {}, "off_s": None, "off_status": "not run", "off_cost": None},
+                   {"query": "2a", "experts": {"hint": {"expert": "HintPlanSel", "action": prefix, "label": "off: nestloop",
+                                                        "opt_ms": 100.0, "cost": 200.0, "s": 0.5, "status": "ok"}},
+                    "off_s": 1.0, "off_status": "ok", "off_cost": 100.0}]
+        text, wins = G.render(results, 2)
+        self.assertIn("| 2a | 1.00 s | hint | 0.50 s | 0.50 | 2.00 | 100 | off: nestloop |", text)
+        self.assertEqual(wins, [("2a", "hint", 0.5)])

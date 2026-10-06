@@ -5,11 +5,13 @@ from typing import Dict, Tuple
 
 NQO_MODES: Tuple[str, ...] = ("off", "auto", "hint", "join")
 
-# (init_density, max_density, min_density); node size stays at SELIX's 16MB
+# (init_density, max_density, min_density); node size stays at SELIX's 16MB.
+# Round 1 showed that densities below the default never win a phase (more memory,
+# no faster), so the third preset is a middle density instead of a sparse one.
 SELIX_PRESETS: Dict[str, Tuple[float, float, float]] = {
     "dense": (0.85, 0.95, 0.75),
+    "mid": (0.80, 0.90, 0.70),
     "default": (0.70, 0.80, 0.60),
-    "sparse": (0.50, 0.60, 0.40),
 }
 SELIX_PRESET_NAMES: Tuple[str, ...] = tuple(SELIX_PRESETS)
 

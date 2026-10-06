@@ -64,7 +64,7 @@ SELIX 的离线部分与运行时部分互不相通。
 | DRL 调参器 | 8 维（单负载）或 4 维（多负载）配置向量：节点大小、三个密度、代价权重 | **原版从未落地**：`SELIXIndexEngine` 建索引时不调任何 setter，PPO 的输出只存在 zip 文件里 |
 | 索引内部 | 扩容、分裂（向下/横向）、重训线性模型 | 在线，由规则触发，不受学习器控制 |
 
-雏形为 GA 补的通道：三个 GUC `selix.init_density`、`selix.max_density`、`selix.min_density`，在下一次索引写入时一起校验并生效（见 `patches/neurdb/0001-*.patch`）。"SELIX 独立运行"在实验中对应**静态配置**：`none`/`nqo` 臂用默认 (0.70, 0.80, 0.60)；`selix`/`both` 臂用 `sweep` 阶段选出的单一档位，这相当于 SELIX 自己的离线调参结果。
+雏形为 GA 补的通道：三个 GUC `selix.init_density`、`selix.max_density`、`selix.min_density`，在下一次索引写入时一起校验并生效（见 `patches/neurdb/0001-*.patch`）。"SELIX 独立运行"在实验中对应**静态配置**：`none`/`nqo` 臂用默认 (0.70, 0.80, 0.60)；`selix`/`static-best` 臂用 `sweep_selix` 阶段选出的单一档位，这相当于 SELIX 自己的离线调参结果。
 
 运行时证据：`nrindex_stats()` 的 13 列，每步由 YCSB 连接读取；报告第 3.2 节列出每个臂在每个阶段生效过的密度、每步结构调整次数、单次操作耗时与索引内存。
 
@@ -97,9 +97,11 @@ GA 不替换 NQO 和 SELIX 的内部学习器，而是在它们之上选择"用�
 | NQO 模式 | 实现 | | SELIX 档位 | init / max / min |
 |---|---|---|---|---|
 | off | `enable_molqo = off` | | dense | 0.85 / 0.95 / 0.75 |
-| auto | `molqo.expert_filter = all`（原版） | | default | 0.70 / 0.80 / 0.60（原版） |
-| hint | `molqo.expert_filter = hint` | | sparse | 0.50 / 0.60 / 0.40 |
+| auto | `molqo.expert_filter = all`（原版） | | mid | 0.80 / 0.90 / 0.70 |
+| hint | `molqo.expert_filter = hint` | | default | 0.70 / 0.80 / 0.60（原版） |
 | join | `molqo.expert_filter = join` | | | |
+
+第一轮用的第三档是 sparse（0.50 / 0.60 / 0.40）。它在两个阶段都没有赢过，只多占内存，第二轮换成 mid。
 
 下发方式：NQO 模式通过 `ALTER SYSTEM` + `pg_reload_conf()`，对所有 JOB 客户端的下一条查询生效；SELIX 档位交给 YCSB 连接执行三条 `SET selix.*`。编号见 `gaproto/actions.py`：`action = 模式编号 × 3 + 档位编号`，原版对应 `auto/default` = 4。
 
@@ -120,7 +122,7 @@ r = 0.5·log(q_J / q_J_ref) + 0.5·[log(c_ref / c_idx) − 0.5·log(mem / mem_re
 | `none` | off | default | 两个学习组件都不起作用：原生优化器 + 静态默认索引参数 |
 | `nqo` | auto | default | NQO 独立运行（= 原版 NeurDB；SELIX 在原版里就是静态默认值） |
 | `selix` | off | sweep 选出的档位 | SELIX 独立运行：按它自己的离线调参方式为整个负载选一组参数 |
-| `both` | auto | 同上 | 两者各自独立、无协调 |
+| `static-best` | 扫描选出的最优模式 | 同上 | 两者各自调到最好、无协调（第一轮里这个臂叫 `both`，并错误地固定为 NQO 开） |
 | `ga` | 每步由策略决定 | 每步由策略决定 | GA 协调两者 |
 
-`nqo`、`selix`、`both` 相对 `none` 的差异回答"各自独立运行用多少资源、有多少收益"；`ga` 相对 `both` 的差异回答"协调是否比各自独立调好再叠加更好"。资源按组件分组（`gaproto/procstat.py`）：NQO 服务进程、NQO 回连数据库的后端、JOB 后端、YCSB 后端、数据库后台进程、实验程序本身。
+`nqo`、`selix`、`static-best` 相对 `none` 的差异回答"各自独立运行用多少资源、有多少收益"；`ga` 相对 `static-best` 的差异回答"协调是否比各自独立调好再叠加更好"。资源按组件分组（`gaproto/procstat.py`）：NQO 服务进程、NQO 回连数据库的后端、JOB 后端、YCSB 后端、数据库后台进程、实验程序本身。
