@@ -101,14 +101,14 @@ docker exec neurdb-ga bash /neuragent/deploy/check_deploy.sh
 
 `start_services.sh` 启动数据库，再以冻结模式启动 NQO 服务（`run_moqoe_prototype.sh`，4 个工作进程，每个加载自己的模型，约 30 秒）。注意 NQO 服务连接数据库时会执行上游代码里的 `ALTER SYSTEM SET autovacuum TO off`，这是 NeurDB 原有行为，对所有对照臂一致。
 
-`check_deploy.sh` 做 26 项检查，全部应为 PASS。E4 要把 JOB 查询 19d 执行两次（NQO 关 / JoinOrder），在 4 核 16 GB 的机器上约 1 分钟，在开发机上用了 5 分钟：
+`check_deploy.sh` 做 26 项检查，全部应为 PASS，约 1 分钟：
 
 | 组 | 检查 |
 |---|---|
 | D1–D9 | 服务是 NeurDB 构建、预加载顺序、IMDB 表与行数、扩展、`molqo_status()`、并行与 JIT 已关 |
 | S1–S4 | 在一个会话里建 nrindex、1000 次点查正确、插入后可查、`nrindex_stats()` 计数与 dense 档参数生效 |
-| N1–N4 | NQO 服务 `/health`、`/stats`；用 `tools/nqo_probe.py` 把查询 1a 送给两位专家，都无错应答；JoinOrder 对查询 19d 给出 `Leading` 提示 |
-| E1–E4 | 查询 1a 经 nr_molqo 规划：JoinOrder 的决策被报告、HintPlanSel 的 SET 生效且语句后复位；查询 19d 的 `Leading` 提示经 pg_hint_plan 生效 |
+| N1–N4 | NQO 服务 `/health`、`/stats`；用 `tools/nqo_probe.py` 把查询 1a 与 19d 送给专家，都无错应答。JoinOrder 对 19d 是否给提示只作为 INFO 报告：那是专家自己的决定，取决于它的 KNN 门槛，不是部署问题 |
+| E1–E4 | 查询 1a 经 nr_molqo 执行：JoinOrder 的决策被报告、HintPlanSel 的 SET 生效且语句后复位；手写的 `Leading` 提示经 pg_hint_plan 改变计划 |
 | R1–R3 | cgroup v2 文件可读、进程 PSS 可读 |
 | P1–P2 | Python 环境可导入、单元测试通过 |
 
@@ -206,7 +206,7 @@ $E report      # runs/imdb/report.md 与 summary.json
 |---|---|
 | 第 1–2 步：建容器、编译引擎与四个扩展、Python 环境、集群初始化 | 通过，约 26 分钟（引擎编译 19 分钟） |
 | 第 3 步：下载 1.2 GB 压缩包、装载 21 张表、外键、`ANALYZE`、行数核对、113 条 JOB 查询 | 通过，库 9.1 GB；21 张表行数全部与基准一致 |
-| 第 4 步：`check_deploy.sh` 26 项 | 全部通过；E4 确认 19d 在 JoinOrder 提示下的计划与原生计划不同 |
+| 第 4 步：`check_deploy.sh` 26 项 | 全部通过 |
 | 真实 NQO 模型：Python 3.10、torch 2.2.2 CPU、psqlparse 源码编译 | 通过；1 个工作进程驻留 350 MB，启动 5 到 8 秒 |
 | 真实 NQO 模型的两位专家 | HintPlanSel 对每条查询返回一组开关；JoinOrder 对快查询不改写、对 19d 给出 `Leading(chn ci)`，与代码中"预测延迟超过 100 ms 才提示"的门槛一致 |
 | 第 5 步：缩短配置下的整条流水线（30 条快查询、1 回合基线、3 档扫描、12 步训练、5 个臂评估、报告） | 通过，约 35 分钟；报告各节均有数据 |
