@@ -3,8 +3,8 @@
 Every query of --job-dir is run on the database with NQO switched off (the
 cost-based optimizer), --runs times; the fastest run counts. Queries at or
 below --threshold seconds are copied to --out (the "fast" set); with
---out-long, queries above the threshold that still finish within --long-max
-seconds are copied there (the "long" set). Latencies go to <out>/latencies.json
+--out-long, queries whose baseline lies between --long-min (default: the
+threshold) and --long-max seconds are copied there (the "long" set). Latencies go to <out>/latencies.json
 and <out-long>/latencies.json.
 
 Usage (inside the container, in experiment/):
@@ -36,6 +36,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default="queries/job_fast")
     ap.add_argument("--threshold", type=float, default=1.0, help="seconds")
     ap.add_argument("--out-long", default="", help="directory for the queries above the threshold")
+    ap.add_argument("--long-min", type=float, default=0.0,
+                    help="shortest baseline (seconds) admitted to the long set (default: --threshold)")
     ap.add_argument("--long-max", type=float, default=40.0,
                     help="longest baseline (seconds) admitted to the long set")
     ap.add_argument("--runs", type=int, default=2, help="runs per query; the fastest counts")
@@ -99,19 +101,23 @@ def main(argv=None) -> int:
     print(f"\n{len(fast)} of {len(files)} queries at or below {args.threshold} s, copied to {args.out}; "
           f"one pass over them takes {total:.1f} s on one client")
     if args.out_long:
+        long_min = args.long_min or args.threshold
         long_q = sorted(n for n, r in results.items()
-                        if r["best_s"] is not None and args.threshold < r["best_s"] <= args.long_max)
+                        if r["best_s"] is not None and long_min <= r["best_s"] <= args.long_max)
         os.makedirs(args.out_long, exist_ok=True)
         for old in glob.glob(os.path.join(args.out_long, "*.sql")):
             os.remove(old)
         for name in long_q:
             shutil.copy(os.path.join(args.job_dir, name + ".sql"), os.path.join(args.out_long, name + ".sql"))
         with open(os.path.join(args.out_long, "latencies.json"), "w", encoding="utf-8") as f:
-            json.dump({"threshold_s": args.threshold, "long_max_s": args.long_max, "selected": long_q,
+            json.dump({"long_min_s": long_min, "long_max_s": args.long_max, "selected": long_q,
                        "results": {n: results[n] for n in long_q}}, f, indent=2)
         total_long = sum(results[n]["best_s"] for n in long_q)
-        print(f"{len(long_q)} queries between {args.threshold} and {args.long_max} s, copied to {args.out_long}; "
+        print(f"{len(long_q)} queries between {long_min} and {args.long_max} s, copied to {args.out_long}; "
               f"one pass over them takes {total_long:.1f} s on one client")
+        if len(long_q) < 8:
+            print(f"warning: only {len(long_q)} long queries; a phase built on them depends on very few queries",
+                  file=sys.stderr)
     if len(fast) < args.min_queries:
         print(f"warning: fewer than {args.min_queries} queries; raise --threshold or check the machine",
               file=sys.stderr)

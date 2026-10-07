@@ -21,8 +21,9 @@
 #
 # Settings:
 #   CONFIG            default config/imdb_r2.json  (config/imdb_r2_short.json for a quick check)
-#   THRESHOLD         fast/long split of the JOB queries, seconds             default 1.0
-#   LONG_MAX          longest baseline admitted to the long set, seconds        default 40
+#   THRESHOLD         upper bound of the fast set, seconds                      default 1.0
+#   LONG_MIN          shortest baseline admitted to the long set, seconds       default 10
+#   LONG_MAX          longest baseline admitted to the long set, seconds        default 120
 #   GAIN_RUNS         runs per variant in the gain calibration                  default 3
 #   GAIN_TIMEOUT      statement timeout in the gain calibration, seconds        default 120
 #   MEMCAL_KEYS       index sizes of the memory calibration                     default 1000000,20000000
@@ -36,7 +37,7 @@
 #   RUN_PREFIX        prefix of the run names under <log_dir>                  default empty
 set -euo pipefail
 if [ "$(id -u)" = 0 ]; then
-    exec su neurdb -c "CONFIG=${CONFIG:-} THRESHOLD=${THRESHOLD:-} LONG_MAX=${LONG_MAX:-} GAIN_RUNS=${GAIN_RUNS:-} \
+    exec su neurdb -c "CONFIG=${CONFIG:-} THRESHOLD=${THRESHOLD:-} LONG_MIN=${LONG_MIN:-} LONG_MAX=${LONG_MAX:-} GAIN_RUNS=${GAIN_RUNS:-} \
         GAIN_TIMEOUT=${GAIN_TIMEOUT:-} MEMCAL_KEYS=${MEMCAL_KEYS:-} MEMCAL_STEPS=${MEMCAL_STEPS:-} \
         BASELINE_EPISODES=${BASELINE_EPISODES:-} TRAIN_STEPS=${TRAIN_STEPS:-} EVAL_SEEDS=${EVAL_SEEDS:-} \
         EVAL_EPISODES=${EVAL_EPISODES:-} NQO_MODE=${NQO_MODE:-} SELIX_PRESET=${SELIX_PRESET:-} RUN_PREFIX=${RUN_PREFIX:-} bash $0 $*"
@@ -45,7 +46,8 @@ cd "$(dirname "$0")"
 PY=${PY:-/opt/venv/bin/python}
 CONFIG=${CONFIG:-config/imdb_r2.json}
 THRESHOLD=${THRESHOLD:-1.0}
-LONG_MAX=${LONG_MAX:-40}
+LONG_MIN=${LONG_MIN:-10}
+LONG_MAX=${LONG_MAX:-120}
 GAIN_RUNS=${GAIN_RUNS:-3}
 GAIN_TIMEOUT=${GAIN_TIMEOUT:-120}
 MEMCAL_KEYS=${MEMCAL_KEYS:-1000000,20000000}
@@ -89,9 +91,9 @@ run_stage() {
         log "unit tests"
         $PY -m unittest discover -s tests -p "test_*.py" ;;
     queries)
-        log "JOB queries: fast set <= $THRESHOLD s -> $FAST_DIR, long set $THRESHOLD..$LONG_MAX s -> $LONG_DIR"
+        log "JOB queries: fast set <= $THRESHOLD s -> $FAST_DIR, long set $LONG_MIN..$LONG_MAX s -> $LONG_DIR"
         $PY tools/select_job_queries.py --config "$CONFIG" --job-dir queries/job_all --out "$FAST_DIR" \
-            --threshold "$THRESHOLD" --out-long "$LONG_DIR" --long-max "$LONG_MAX" "$@" ;;
+            --threshold "$THRESHOLD" --out-long "$LONG_DIR" --long-min "$LONG_MIN" --long-max "$LONG_MAX" "$@" ;;
     gain)
         log "calibration 1: expert plans vs cost-based plans, $GAIN_RUNS runs, timeout $GAIN_TIMEOUT s"
         $PY tools/nqo_plan_gain.py --config "$CONFIG" --query-dir queries/job_all \

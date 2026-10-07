@@ -4,7 +4,7 @@
 
 | 第二轮与第一轮的差别 | 第一轮 | 第二轮 |
 |---|---|---|
-| JOB 查询 | 1 秒内的快查询，两个阶段相同 | 阶段 A 用长查询（基线 1 到 40 秒），阶段 B 用快查询 |
+| JOB 查询 | 1 秒内的快查询，两个阶段相同 | 阶段 A 用长查询（基线 10 到 120 秒），阶段 B 用快查询 |
 | 步长 / 每阶段步数 | 30 秒 / 30 步 | 60 秒 / 20 步（回合仍为 40 分钟） |
 | 阶段 A 的负载 | 8 个 JOB 客户端，YCSB 90% 点查限速 2000/s | 3 个客户端跑长查询，YCSB 70% 点查限速 2000/s（读多阶段索引也在增长） |
 | SELIX 第三档 | sparse 0.50/0.60/0.40 | mid 0.80/0.90/0.70 |
@@ -53,7 +53,7 @@ docker exec neurdb-ga bash /neuragent/experiment/pipeline.sh test  # 单元测�
 docker exec neurdb-ga bash /neuragent/experiment/pipeline.sh queries
 ```
 
-原版优化器下每条 JOB 查询跑 2 次，1 秒内完成的进 `experiment/queries/job_fast`，1 到 40 秒的进 `experiment/queries/job_long`，超过 40 秒或超时的不用。第一轮实验机上的数据预计约 75 条快、约 30 条长。检查点：两行 `... copied to ...`，长查询至少 15 条；少于 15 条时用 `LONG_MAX=60` 重跑。
+原版优化器下每条 JOB 查询跑 2 次，1 秒内完成的进 `experiment/queries/job_fast`，10 到 120 秒的进 `experiment/queries/job_long`（`LONG_MIN=10`、`LONG_MAX=120` 是默认值），1 到 10 秒之间和超过 120 秒的不用。筛选时的超时是 180 秒，约 30 分钟。检查点：两行 `... copied to ...`。在 4 核实验机上长查询预计只有几条（26c、19d、16b 等）；少于 8 条时脚本会打印警告，结论会系于很少几条查询，报告时要写明。
 
 ---
 
@@ -178,11 +178,11 @@ grep -E "^=====|best |\[episode|mid-way|-> return|report written|Error|Traceback
 |---|---|
 | `setup_neurdb.sh` 报 `NeuralDB/ has uncommitted changes` | 第 1 步里 `git checkout -- .` 与 `git clean` 没有执行完；在 `NeuralDB/` 里执行后重试 |
 | `update_nqo.sh` 报 `source ... is not the current patched version` | 补丁没有重新打上，检查 `patches/neurdb/0003-*.patch` 是否是新版（约 690 行） |
-| `queries` 阶段长查询太少 | `LONG_MAX=60`；注意 `job.statement_timeout_ms` 是 120 秒，长查询上限不要超过它的一半 |
+| `queries` 阶段长查询太少 | 降低 `LONG_MIN`（例如 `LONG_MIN=5`）；`job.statement_timeout_ms` 是 300 秒，`LONG_MAX` 不要超过它的一半 |
 | `gain` 阶段很慢 | `GAIN_RUNS=2 GAIN_TIMEOUT=60`；或用 `--only 17a,19d,26c` 只测几条 |
 | `memcal` 的 2000 万键种子表准备失败 | 看 `/data/pg.log`；磁盘空间需要再留 3 GB |
 | 收紧内存后数据库起不来 | `shared_buffers` 超过了容器内存的一半；用 `deploy/set_memory.sh` 调小 |
-| 阶段 A 的 JOB 查询超时 | `job.statement_timeout_ms` 120 秒；超时的查询计入 `job_errors`，报告里会显示。多时把 `LONG_MAX` 调小重跑 `queries` |
+| 阶段 A 的 JOB 查询超时 | `job.statement_timeout_ms` 300 秒；超时的查询计入 `job_errors`，报告里会显示。多时把 `LONG_MAX` 调小重跑 `queries` |
 | 训练日志里某个阶段所有动作奖励都相近 | 该阶段没有可学的差别，属于“协调无价值”的情形，不是程序错误 |
 
 ---
