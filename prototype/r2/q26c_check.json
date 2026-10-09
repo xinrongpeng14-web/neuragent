@@ -1,0 +1,134 @@
+[
+ {
+  "variant": "cost_based",
+  "seconds": 522.23,
+  "result": [
+   "'Agua' Man",
+   "1.9",
+   "12 Rounds"
+  ],
+  "blks_read": 922158,
+  "blks_hit": 1684128,
+  "scan_order": [
+   "cct2",
+   "cct1",
+   "kt",
+   "it2",
+   "k",
+   "mk"
+  ]
+ },
+ {
+  "variant": "nqo_arm",
+  "seconds": 143.11,
+  "result": [
+   "'Agua' Man",
+   "1.9",
+   "12 Rounds"
+  ],
+  "blks_read": 432854,
+  "blks_hit": 947914,
+  "scan_order": [
+   "it2",
+   "cct1",
+   "kt",
+   "k",
+   "mk",
+   "t",
+   "cc",
+   "mi_idx",
+   "cct2",
+   "ci",
+   "n",
+   "chn"
+  ]
+ },
+ {
+  "variant": "indexscan_off_only",
+  "seconds": 32.39,
+  "result": [
+   "'Agua' Man",
+   "1.9",
+   "12 Rounds"
+  ],
+  "blks_read": 427996,
+  "blks_hit": 953193,
+  "scan_order": [
+   "it2",
+   "cct1",
+   "kt",
+   "k",
+   "mk",
+   "t",
+   "cc",
+   "mi_idx",
+   "cct2",
+   "ci",
+   "n",
+   "chn"
+  ]
+ },
+ {
+  "variant": "mergejoin_off_only",
+  "seconds": 224.35,
+  "result": [
+   "'Agua' Man",
+   "1.9",
+   "12 Rounds"
+  ],
+  "blks_read": 917322,
+  "blks_hit": 1686796,
+  "scan_order": [
+   "cct2",
+   "cct1",
+   "kt",
+   "it2",
+   "k",
+   "mk"
+  ]
+ },
+ {
+  "variant": "cost_based",
+  "seconds": 221.75,
+  "result": [
+   "'Agua' Man",
+   "1.9",
+   "12 Rounds"
+  ],
+  "blks_read": 912032,
+  "blks_hit": 1692516,
+  "scan_order": [
+   "cct2",
+   "cct1",
+   "kt",
+   "it2",
+   "k",
+   "mk"
+  ]
+ },
+ {
+  "variant": "nqo_arm",
+  "seconds": 100.29,
+  "result": [
+   "'Agua' Man",
+   "1.9",
+   "12 Rounds"
+  ],
+  "blks_read": 432842,
+  "blks_hit": 947917,
+  "scan_order": [
+   "it2",
+   "cct1",
+   "kt",
+   "k",
+   "mk",
+   "t",
+   "cc",
+   "mi_idx",
+   "cct2",
+   "ci",
+   "n",
+   "chn"
+  ]
+ }
+]
