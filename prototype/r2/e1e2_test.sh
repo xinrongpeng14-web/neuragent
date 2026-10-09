@@ -75,6 +75,33 @@ check "C1 concurrent session 1 correct" "$(tail -1 $r1)" "$want"
 check "C2 concurrent session 2 correct" "$(tail -1 $r2)" "$want"
 rm -f $r1 $r2
 
+echo "=== D1: btree and SELIX on the same column ==="
+psql -X -q -d $DB -c "SET client_min_messages = warning" -c "CREATE INDEX e_title_bt ON e_title USING btree (id)" -c "ANALYZE e_title" > /dev/null 2>&1
+idx() { psql -X -q -At -d $DB -c "SET client_min_messages = warning" ${2:+-c "$2"} -c "EXPLAIN $1" 2>&1 | grep -oE "e_title_(nr|bt)" | head -1; }
+check "B1 equality, equal estimates: SELIX wins the tie" "$(idx 'SELECT title FROM e_title WHERE id = 4242')" "e_title_nr"
+check "B2 selix.enable_index = off: btree" "$(idx 'SELECT title FROM e_title WHERE id = 4242' 'SET selix.enable_index = off')" "e_title_bt"
+check "B3 selix.index_cost_scale = 2: btree is cheaper" "$(idx 'SELECT title FROM e_title WHERE id = 4242' 'SET selix.index_cost_scale = 2')" "e_title_bt"
+check "B4 range condition: btree" "$(idx 'SELECT count(*) FROM e_title WHERE id BETWEEN 100 AND 200')" "e_title_bt"
+check "B5 range result correct" "$(q 'SELECT count(*) FROM e_title WHERE id BETWEEN 100 AND 200')" "101"
+
+echo "=== D2: rebuild when the densities change (read-only table) ==="
+out=$(psql -X -q -At -d $DB -c "SET client_min_messages = warning" \
+  -c "SELECT title FROM e_title WHERE id = 4242" \
+  -c "SELECT builds FROM nrindex_build_time()" \
+  -c "SET selix.init_density = 0.85" -c "SET selix.max_density = 0.95" -c "SET selix.min_density = 0.75" \
+  -c "SELECT title FROM e_title WHERE id = 4242" \
+  -c "SELECT builds FROM nrindex_build_time()" \
+  -c "SET selix.rebuild_on_density_change = on" \
+  -c "SELECT title FROM e_title WHERE id = 4242" \
+  -c "SELECT builds, build_ms > 0 FROM nrindex_build_time()" \
+  -c "SELECT title FROM e_title WHERE id = 4242" \
+  -c "SELECT builds FROM nrindex_build_time()" 2>&1)
+check "R6 first use builds once" "$(echo "$out" | sed -n 2p)" "1"
+check "R7 density change without the switch: no rebuild" "$(echo "$out" | sed -n 4p)" "1"
+check "R8 with selix.rebuild_on_density_change: rebuilt once, time recorded" "$(echo "$out" | sed -n 6p)" "2|t"
+check "R9 no further rebuild while the densities stay" "$(echo "$out" | sed -n 8p)" "2"
+check "R10 results correct throughout" "$(echo "$out" | sed -n '1p;3p;5p;7p' | sort -u)" "Pressure Point"
+
 echo "=== cleanup ==="
 psql -X -q -d $DB -c "SET client_min_messages = warning" -c "DROP TABLE IF EXISTS e_title, e_mk" > /dev/null 2>&1
 echo "=== $pass passed, $fail failed ==="

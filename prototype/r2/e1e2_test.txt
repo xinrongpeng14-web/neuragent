@@ -1,14 +1,14 @@
 === setup: copy of title without btree indexes ===
   PASS  setup: e_title rows  (2528312)
 === repeated keys (foreign-key column): every row is kept ===
-  INFO  build of 4523930 rows: 6517 ms
+  INFO  build of 4523930 rows: 6173 ms
   PASS  R1 nrindex on a foreign-key column is built without error  (0)
   PASS  R2 the movie with the most keywords: all rows, index scan  (540|14371129)
   PASS  R3 same movie, bitmap scan  (540|14371129)
   PASS  R4 join over 26,000 movies in a fresh session: same rows as btree  (47090|648520372)
   PASS  R5 a movie without keywords returns no row  (0)
 === build in one session (connection A) ===
-  INFO  build of 2.5M keys: 1515 ms
+  INFO  build of 2.5M keys: 2406 ms
 === E2: the planner chooses by cost, no switches turned off ===
   PASS  P1 equality lookup uses nrindex  (1)
   PASS  P2 range condition does not use nrindex  (0)
@@ -19,10 +19,22 @@
   PASS  E1b ... and the lookups went through nrindex  (1)
   PASS  E1c fresh session C, single lookups  (Pressure Point)
   PASS  E1d missing key returns no row  (0)
-  INFO  lazy builds logged so far: 8
+  INFO  lazy builds logged so far: 13
   PASS  E1e lazy build happened in the fresh sessions  (yes)
 === two sessions at the same time ===
   PASS  C1 concurrent session 1 correct  (100000|1530596)
   PASS  C2 concurrent session 2 correct  (100000|1530596)
+=== D1: btree and SELIX on the same column ===
+  PASS  B1 equality, equal estimates: SELIX wins the tie  (e_title_nr)
+  PASS  B2 selix.enable_index = off: btree  (e_title_bt)
+  PASS  B3 selix.index_cost_scale = 2: btree is cheaper  (e_title_bt)
+  PASS  B4 range condition: btree  (e_title_bt)
+  PASS  B5 range result correct  (101)
+=== D2: rebuild when the densities change (read-only table) ===
+  PASS  R6 first use builds once  (1)
+  PASS  R7 density change without the switch: no rebuild  (1)
+  PASS  R8 with selix.rebuild_on_density_change: rebuilt once, time recorded  (2|t)
+  PASS  R9 no further rebuild while the densities stay  (2)
+  PASS  R10 results correct throughout  (Pressure Point)
 === cleanup ===
-=== 16 passed, 0 failed ===
+=== 26 passed, 0 failed ===
