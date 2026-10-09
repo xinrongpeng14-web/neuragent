@@ -1,6 +1,7 @@
 #!/bin/bash
 # Tests of the nrindex fixes E1 (per-backend lazy build), E2 (cost estimate)
-# and E5 (a key may hold many rows). Runs inside the container as neurdb, on imdb_ori.
+# and E5 (a key may hold many rows), D1/D2 (btree beside SELIX, rebuild on a
+# density change) and E6 (a key with more rows than a SELIX data node). Runs inside the container as neurdb, on imdb_ori.
 export PATH=/opt/neurdb/bin:$PATH
 DB=imdb_ori
 pass=0; fail=0
@@ -9,7 +10,7 @@ q() { psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c "$1" 2>&1 
 
 echo "=== setup: copy of title without btree indexes ==="
 psql -X -q -d $DB -c "SET client_min_messages = warning" \
-  -c "DROP TABLE IF EXISTS e_title, e_mk" \
+  -c "DROP TABLE IF EXISTS e_title, e_mk, e_ci" \
   -c "CREATE TABLE e_title AS SELECT id, title, production_year FROM title" \
   -c "ANALYZE e_title" > /dev/null 2>&1
 check "setup: e_title rows" "$(q 'SELECT count(*) FROM e_title')" "2528312"
@@ -107,7 +108,30 @@ check "R8 with selix.rebuild_on_density_change: rebuilt once, time recorded" "$(
 check "R9 no further rebuild while the densities stay" "$(echo "$out" | sed -n 8p)" "2"
 check "R10 results correct throughout" "$(echo "$out" | sed -n '1p;3p;5p;7p' | sort -u)" "Pressure Point"
 
+echo "=== E6: a key with more rows than a SELIX data node ==="
+# cast_info.person_role_id = 1 has 1.3M rows; a SELIX data node holds about
+# 734,000, and building the index on this column crashed the server
+psql -X -q -d $DB -c "SET client_min_messages = warning" -c "DROP TABLE IF EXISTS e_ci" \
+  -c "CREATE TABLE e_ci AS SELECT id, person_role_id FROM cast_info" -c "ANALYZE e_ci" > /dev/null 2>&1
+t0=$(date +%s%N)
+out=$(psql -X -q -d $DB -c "CREATE INDEX e_ci_nr ON e_ci USING nrindex (person_role_id)" -c "ANALYZE e_ci" 2>&1)
+echo "  INFO  build on person_role_id: $(( ($(date +%s%N) - t0) / 1000000 )) ms"
+check "K1 index on person_role_id is built, server alive" "$(echo "$out" | grep -ciE 'error|closed|terminat')|$(q 'SELECT 1')" "0|1"
+iq() { psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c 'SET enable_seqscan = off' -c 'SET enable_bitmapscan = off' -c "$1" 2>&1 | tail -1; }
+for k in 1 4463 53 2; do
+  check "K2 key $k: same rows as cast_info (fresh session, index scan)" \
+    "$(iq "SELECT count(*), sum(id) FROM e_ci WHERE person_role_id = $k")" \
+    "$(q "SELECT count(*), sum(id) FROM cast_info WHERE person_role_id = $k")"
+done
+check "K3 the big key is read through nrindex" \
+  "$(psql -X -q -At -d $DB -c 'SET enable_seqscan = off' -c 'SET enable_bitmapscan = off' -c 'EXPLAIN SELECT count(*) FROM e_ci WHERE person_role_id = 1' 2>&1 | grep -c e_ci_nr)" "1"
+check "K4 missing key returns no row" "$(iq 'SELECT count(*) FROM e_ci WHERE person_role_id = -7')" "0"
+want=$(q "SELECT count(*), sum(c.id) FROM generate_series(1, 4000) g JOIN cast_info c ON c.person_role_id = g")
+got=$(psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c "SET enable_hashjoin = off" -c "SET enable_mergejoin = off" -c "SET enable_seqscan = off" -c "SET enable_bitmapscan = off" \
+      -c "SELECT count(*), sum(c.id) FROM generate_series(1, 4000) g JOIN e_ci c ON c.person_role_id = g" 2>&1 | tail -1)
+check "K5 join over keys 1..4000 (big and small keys): same rows as cast_info" "$got" "$want"
+
 echo "=== cleanup ==="
-psql -X -q -d $DB -c "SET client_min_messages = warning" -c "DROP TABLE IF EXISTS e_title, e_mk" > /dev/null 2>&1
+psql -X -q -d $DB -c "SET client_min_messages = warning" -c "DROP TABLE IF EXISTS e_title, e_mk, e_ci" > /dev/null 2>&1
 echo "=== $pass passed, $fail failed ==="
 [ $fail = 0 ]

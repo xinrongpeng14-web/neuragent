@@ -77,7 +77,7 @@ scp "zhanhao@34.31.210.7:/home/zhanhao/neuragent/patches/neurdb/*.patch" patches
 wc -l patches/neurdb/*.patch
 ```
 
-检查点：0001 约 1225 行，0002 约 1145 行，0003 约 690 行。
+检查点：0001 约 1303 行，0002 约 1145 行，0003 约 690 行。
 
 **1.2 重新打补丁。** `setup_neurdb.sh` 要求 `NeuralDB/` 没有未提交的改动，所以先撤掉旧补丁的改动：
 
@@ -119,7 +119,7 @@ docker exec neurdb-ga su neurdb -c "bash /neuragent/prototype/r2/e1e2_test.sh"
 |---|---|
 | `check_deploy.sh` | `26 passed, 0 failed` |
 | `pipeline.sh test` | `Ran 56 tests` 与 `OK` |
-| `e1e2_test.sh` | `26 passed, 0 failed`。这是 SELIX 一侧改动的正确性测试，在 title 与 movie_keyword 的副本上做，约 5 分钟，结束后自动删除副本 |
+| `e1e2_test.sh` | `35 passed, 0 failed`。这是 SELIX 一侧改动的正确性测试，在 title、movie_keyword 与 cast_info 的副本上做，约 20 分钟（E6 在 cast_info 上，每个新连接要重建一次约 70 秒），结束后自动删除副本 |
 
 任何一项有 FAIL，先停下来，把输出发给我。
 
