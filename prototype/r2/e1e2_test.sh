@@ -13,6 +13,11 @@ psql -X -q -d $DB -c "SET client_min_messages = warning" \
   -c "CREATE TABLE e_title AS SELECT id, title, production_year FROM title" \
   -c "ANALYZE e_title" > /dev/null 2>&1
 check "setup: e_title rows" "$(q 'SELECT count(*) FROM e_title')" "2528312"
+# nrindex_build_time() is in nram--1.0.sql, but a database whose extension was
+# created before the function was added does not have it: register it here (D2)
+out=$(psql -X -q -d $DB -c "CREATE OR REPLACE FUNCTION nrindex_build_time(OUT builds bigint, OUT build_ms double precision)
+  RETURNS record AS 'nram', 'nrindex_build_time' LANGUAGE C STRICT VOLATILE" 2>&1)
+check "setup: nrindex_build_time() registered" "$(echo "$out" | grep -ci error)" "0"
 
 echo "=== repeated keys (foreign-key column): every row is kept ==="
 # full copy of movie_keyword: 4.5M rows, a movie has up to hundreds of keywords
