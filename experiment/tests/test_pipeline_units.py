@@ -279,3 +279,76 @@ class Round2Test(unittest.TestCase):
         text, wins = G.render(results, 2)
         self.assertIn("| 2a | 1.00 s | hint | 0.50 s | 0.50 | 2.00 | 100 | off: nestloop |", text)
         self.assertEqual(wins, [("2a", "hint", 0.5)])
+
+
+class FeasibilityToolTest(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+        import selix_feasibility as F
+        self.F = F
+
+    def test_variants(self):
+        F = self.F
+        self.assertEqual([F.variant_name(v) for v in F.variants_for("f1")], ["off/btree", "off/cost/default"])
+        self.assertEqual(len(F.variants_for("f3")), 3)
+        f4 = F.variants_for("f4")
+        self.assertEqual(len(f4), 21)                       # 3 x (1 + 2 x 3)
+        self.assertEqual(len({F.variant_name(v) for v in f4}), 21)
+        # grouped by density so that a density change happens once per group
+        order = [F.index_setting(v) for v in F.order_variants(f4, 0)]
+        dens = [o.split("/")[-1] for o in order]
+        changes = sum(1 for a, b in zip(dens, dens[1:]) if a != b)
+        self.assertLessEqual(changes, 3)
+        self.assertNotEqual(F.order_variants(f4, 0)[0], F.order_variants(f4, 1)[0])
+
+    def test_settings_sql(self):
+        F = self.F
+        s = F.settings_sql(dict(nqo="hint", scheme="prefer", density="dense"))
+        self.assertIn("SET enable_molqo = on", s)
+        self.assertIn("SET molqo.expert_filter = 'hint'", s)
+        self.assertIn("SET selix.index_cost_scale = 0.01", s)
+        self.assertTrue(any("selix.init_density = 0.85" in x for x in s))
+        self.assertIn("SET selix.enable_index = off", F.settings_sql(dict(nqo="off", scheme="btree", density="default")))
+
+    def test_plan_parsing(self):
+        F = self.F
+        plan = {"Query Text": "x", "Plan": {"Node Type": "Nested Loop", "Plans": [
+            {"Node Type": "Index Scan", "Index Name": "nr_title_id"},
+            {"Node Type": "Bitmap Heap Scan", "Plans": [{"Node Type": "Bitmap Index Scan", "Index Name": "title_pkey"}]}]}}
+        notices = ["INFO:  MoLQO: optimization applied (hint), server x\n",
+                   "LOG:  duration: 12.0 ms  plan:\n" + json.dumps(plan) + "\n"]
+        got = F.plan_from_notices(notices)
+        self.assertEqual(sorted(F.index_names(got)), ["nr_title_id", "title_pkey"])
+        self.assertEqual(F.nqo_action(notices), "hint")
+        self.assertIsNone(F.plan_from_notices(["LOG:  something else"]))
+
+    def _rec(self, q, variant, net, status="ok", result="r", selix=()):
+        parts = variant.split("/")
+        return {"query": q, "variant": variant, "net_s": net, "wall_s": net + 0.1, "build_s": 0.1, "status": status,
+                "result": result, "selix_used": list(selix), "rep": 0, "nqo": parts[0], "scheme": parts[1],
+                "density": parts[2] if len(parts) > 2 else "default"}
+
+    def test_f1_and_f2(self):
+        F = self.F
+        recs = [self._rec("1a", "off/btree", 1.0), self._rec("1a", "off/cost/default", 0.8, selix=["nr_title_id"]),
+                self._rec("2a", "off/btree", 2.0), self._rec("2a", "off/cost/default", 2.1, result="different")]
+        text, ok, used = F.analyze_f1({"records": recs})
+        self.assertFalse(ok)                                 # 2a differs
+        self.assertEqual(used, ["nr_title_id"])
+        text, ok = F.analyze_f2({"records": recs})
+        self.assertTrue(ok)                                  # 2.9 vs 3.0
+
+    def test_flips(self):
+        F = self.F
+        best = {}
+        # query q: with btree, NQO off is best; with prefer/dense, hint is best (both by > 10%)
+        for (m, s), v in {("off", "btree"): 1.0, ("hint", "btree"): 2.0, ("auto", "btree"): 2.0,
+                          ("off", "prefer/dense"): 3.0, ("hint", "prefer/dense"): 1.0, ("auto", "prefer/dense"): 3.0}.items():
+            best[("q", f"{m}/btree" if s == "btree" else f"{m}/{s}")] = v
+        nf, xf = F.flips(best, ["q"], ["btree", "prefer/dense"], ("off", "hint", "auto"))
+        self.assertEqual(len(nf), 1)
+        self.assertEqual(len(xf), 1)
+        # within the margin: no flip
+        best[("q", "off/prefer/dense")] = 1.05
+        nf, _ = F.flips(best, ["q"], ["btree", "prefer/dense"], ("off", "hint", "auto"))
+        self.assertEqual(nf, [])

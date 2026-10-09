@@ -6,14 +6,14 @@
 #   NQO_WORKERS   worker processes of the NQO service (each loads its own models)   default 4
 #   NQO_DATABASE  database the service reads statistics from                          default imdb_ori
 #   NQO_PORT      port                                                                default 8666
-#   NQO_CACHE     1 = the service answers repeated queries from a decision cache       default 0
+#   NQO_CACHE     1 = the service answers repeated queries from a decision cache       default 1
 set -euo pipefail
 if [ "$(id -u)" = 0 ]; then exec su neurdb -c "NQO_WORKERS=${NQO_WORKERS:-} NQO_DATABASE=${NQO_DATABASE:-} NQO_PORT=${NQO_PORT:-} NQO_CACHE=${NQO_CACHE:-} bash $0 $*"; fi
 export PATH=/opt/neurdb/bin:$PATH
 NQO_WORKERS=${NQO_WORKERS:-4}
 NQO_DATABASE=${NQO_DATABASE:-imdb_ori}
 NQO_PORT=${NQO_PORT:-8666}
-NQO_CACHE=${NQO_CACHE:-0}
+NQO_CACHE=${NQO_CACHE:-1}
 NQO_DIR=/opt/nqo/neurqo_frame
 LOG=/data/nqo.log
 

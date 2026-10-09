@@ -19,6 +19,13 @@
 #   report      the result report (Markdown + JSON), percentages relative to static-best
 #   all         everything above except the two calibrations
 #
+# Hierarchical plan (GlobalAgent_hierarchical.md), section 4:
+#   selix_list     candidate columns for SELIX and the SELIX indexes that exist
+#   selix_create   build SELIX beside the btree indexes (SELIX_COLUMNS to restrict)
+#   selix_keep     drop the SELIX indexes that no query of either group used in F1
+#   selix_drop     drop every SELIX index built by selix_create
+#   f1 f2 f3 f4    feasibility checks on GROUP (long | short); exit code 2 = check not passed
+#
 # Settings:
 #   CONFIG            default config/imdb_r2.json  (config/imdb_r2_short.json for a quick check)
 #   THRESHOLD         upper bound of the fast set, seconds                      default 1.0
@@ -35,12 +42,16 @@
 #   NQO_MODE          NQO mode of the nqo / static-best arms; default: best of sweep_nqo
 #   SELIX_PRESET      preset of the selix / static-best arms; default: best of sweep_selix
 #   RUN_PREFIX        prefix of the run names under <log_dir>                  default empty
+#   GROUP             query group of f1-f4: long or short                      default long
+#   F_RUNS            runs per variant in f1-f4 (default: 1 / 3 / 3 / 2)
+#   SELIX_COLUMNS     table.column list for selix_create                       default all candidates
 set -euo pipefail
 if [ "$(id -u)" = 0 ]; then
     exec su neurdb -c "CONFIG=${CONFIG:-} THRESHOLD=${THRESHOLD:-} LONG_MIN=${LONG_MIN:-} LONG_MAX=${LONG_MAX:-} GAIN_RUNS=${GAIN_RUNS:-} \
         GAIN_TIMEOUT=${GAIN_TIMEOUT:-} MEMCAL_KEYS=${MEMCAL_KEYS:-} MEMCAL_STEPS=${MEMCAL_STEPS:-} \
         BASELINE_EPISODES=${BASELINE_EPISODES:-} TRAIN_STEPS=${TRAIN_STEPS:-} EVAL_SEEDS=${EVAL_SEEDS:-} \
-        EVAL_EPISODES=${EVAL_EPISODES:-} NQO_MODE=${NQO_MODE:-} SELIX_PRESET=${SELIX_PRESET:-} RUN_PREFIX=${RUN_PREFIX:-} bash $0 $*"
+        EVAL_EPISODES=${EVAL_EPISODES:-} NQO_MODE=${NQO_MODE:-} SELIX_PRESET=${SELIX_PRESET:-} RUN_PREFIX=${RUN_PREFIX:-} \
+        GROUP=${GROUP:-} F_RUNS=${F_RUNS:-} SELIX_COLUMNS=${SELIX_COLUMNS:-} bash $0 $*"
 fi
 cd "$(dirname "$0")"
 PY=${PY:-/opt/venv/bin/python}
@@ -57,6 +68,9 @@ TRAIN_STEPS=${TRAIN_STEPS:-1200}
 EVAL_SEEDS=${EVAL_SEEDS:-2001,2002,2003}
 EVAL_EPISODES=${EVAL_EPISODES:-2}
 RUN_PREFIX=${RUN_PREFIX:-}
+GROUP=${GROUP:-long}
+F_RUNS=${F_RUNS:-0}
+SELIX_COLUMNS=${SELIX_COLUMNS:-}
 stage=${1:-}; shift || true
 [ -n "$stage" ] || { sed -n '2,40p' "$0"; exit 1; }
 
@@ -144,6 +158,29 @@ run_stage() {
         [ -f "$LOG_DIR/${RUN_PREFIX}train/steps.jsonl" ] && train=(--train "$LOG_DIR/${RUN_PREFIX}train/steps.jsonl")
         $PY -m gaproto.report --config "$CONFIG" --refs "$REFS" --runs "$LOG_DIR/${RUN_PREFIX}eval/steps.jsonl" \
             "${train[@]}" --reference static-best --out "$LOG_DIR/${RUN_PREFIX}report.md" --json "$LOG_DIR/${RUN_PREFIX}summary.json" "$@" ;;
+    selix_list)
+        $PY tools/selix_indexes.py --config "$CONFIG" --list "$@" ;;
+    selix_create)
+        log "SELIX beside the btree indexes${SELIX_COLUMNS:+ on $SELIX_COLUMNS}"
+        $PY tools/selix_indexes.py --config "$CONFIG" --create ${SELIX_COLUMNS:+--columns "$SELIX_COLUMNS"} "$@" ;;
+    selix_keep)
+        log "keep only the SELIX indexes some group used in F1"
+        local used="$LOG_DIR/${RUN_PREFIX}f1_used_indexes_all.txt"
+        ls "$LOG_DIR"/${RUN_PREFIX}f1_*_used_indexes.txt > /dev/null 2>&1 || { echo "run f1 first" >&2; exit 1; }
+        cat "$LOG_DIR"/${RUN_PREFIX}f1_long_used_indexes.txt "$LOG_DIR"/${RUN_PREFIX}f1_short_used_indexes.txt 2>/dev/null \
+            | grep -v '^#' | sort -u > "$used"
+        echo "union of the groups' F1 lists: $(wc -l < "$used") indexes"
+        $PY tools/selix_indexes.py --config "$CONFIG" --keep-only "$used" "$@" ;;
+    selix_drop)
+        log "drop every SELIX index"
+        $PY tools/selix_indexes.py --config "$CONFIG" --drop "$@" ;;
+    f1|f2|f3|f4)
+        log "feasibility check $name on the $GROUP group"
+        local rc=0
+        $PY tools/selix_feasibility.py --config "$CONFIG" --check "$name" --group "$GROUP" \
+            --runs "$F_RUNS" --out "$LOG_DIR/${RUN_PREFIX}${name}_${GROUP}" "$@" || rc=$?
+        [ $rc = 2 ] && echo "($name not passed on the $GROUP group; see the report)"
+        [ $rc = 0 ] || [ $rc = 2 ] || exit $rc ;;
     all)
         for s in test queries seed baseline sweep_nqo sweep_selix train evaluate report; do run_stage $s; done ;;
     *)
