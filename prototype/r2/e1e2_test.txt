@@ -1,10 +1,14 @@
-=== setup: copies of two IMDB tables without btree indexes ===
+=== setup: copy of title without btree indexes ===
   PASS  setup: e_title rows  (2528312)
-=== duplicate keys are refused ===
-  PASS  D1 nrindex on a column with repeated values fails with an error  (1)
+=== repeated keys (foreign-key column): every row is kept ===
+  INFO  build of 4523930 rows: 6517 ms
+  PASS  R1 nrindex on a foreign-key column is built without error  (0)
+  PASS  R2 the movie with the most keywords: all rows, index scan  (540|14371129)
+  PASS  R3 same movie, bitmap scan  (540|14371129)
+  PASS  R4 join over 26,000 movies in a fresh session: same rows as btree  (47090|648520372)
+  PASS  R5 a movie without keywords returns no row  (0)
 === build in one session (connection A) ===
-/neuragent/prototype/r2/e1e2_test.sh: line 25: bc: command not found
-  INFO  build of 2.5M keys:  s
+  INFO  build of 2.5M keys: 1515 ms
 === E2: the planner chooses by cost, no switches turned off ===
   PASS  P1 equality lookup uses nrindex  (1)
   PASS  P2 range condition does not use nrindex  (0)
@@ -15,10 +19,10 @@
   PASS  E1b ... and the lookups went through nrindex  (1)
   PASS  E1c fresh session C, single lookups  (Pressure Point)
   PASS  E1d missing key returns no row  (0)
-  INFO  lazy builds logged so far: 3
+  INFO  lazy builds logged so far: 8
   PASS  E1e lazy build happened in the fresh sessions  (yes)
 === two sessions at the same time ===
   PASS  C1 concurrent session 1 correct  (100000|1530596)
   PASS  C2 concurrent session 2 correct  (100000|1530596)
 === cleanup ===
-=== 12 passed, 0 failed ===
+=== 16 passed, 0 failed ===

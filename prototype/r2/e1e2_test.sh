@@ -1,23 +1,39 @@
 #!/bin/bash
-# Tests of the nrindex fixes E1 (per-backend lazy build), E2 (cost estimate),
-# and the duplicate-key refusal. Runs inside the container as neurdb, on imdb_ori.
+# Tests of the nrindex fixes E1 (per-backend lazy build), E2 (cost estimate)
+# and E5 (a key may hold many rows). Runs inside the container as neurdb, on imdb_ori.
 export PATH=/opt/neurdb/bin:$PATH
 DB=imdb_ori
 pass=0; fail=0
 check() { if [ "$2" = "$3" ]; then echo "  PASS  $1  ($2)"; pass=$((pass+1)); else echo "  FAIL  $1  (got: $2, want: $3)"; fail=$((fail+1)); fi; }
 q() { psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c "$1" 2>&1 | tail -1; }
 
-echo "=== setup: copies of two IMDB tables without btree indexes ==="
+echo "=== setup: copy of title without btree indexes ==="
 psql -X -q -d $DB -c "SET client_min_messages = warning" \
   -c "DROP TABLE IF EXISTS e_title, e_mk" \
   -c "CREATE TABLE e_title AS SELECT id, title, production_year FROM title" \
-  -c "CREATE TABLE e_mk AS SELECT movie_id, keyword_id FROM movie_keyword LIMIT 200000" \
-  -c "ANALYZE e_title" -c "ANALYZE e_mk" > /dev/null 2>&1
+  -c "ANALYZE e_title" > /dev/null 2>&1
 check "setup: e_title rows" "$(q 'SELECT count(*) FROM e_title')" "2528312"
 
-echo "=== duplicate keys are refused ==="
-out=$(psql -X -q -d $DB -c "CREATE INDEX e_mk_nr ON e_mk USING nrindex (movie_id)" 2>&1)
-check "D1 nrindex on a column with repeated values fails with an error" "$(echo "$out" | grep -c 'rows whose value repeats')" "1"
+echo "=== repeated keys (foreign-key column): every row is kept ==="
+# full copy of movie_keyword: 4.5M rows, a movie has up to hundreds of keywords
+psql -X -q -d $DB -c "SET client_min_messages = warning" -c "DROP TABLE IF EXISTS e_mk" \
+  -c "CREATE TABLE e_mk AS SELECT movie_id, keyword_id FROM movie_keyword" -c "ANALYZE e_mk" > /dev/null 2>&1
+t0=$(date +%s%N)
+out=$(psql -X -q -d $DB -c "CREATE INDEX e_mk_nr ON e_mk USING nrindex (movie_id)" -c "ANALYZE e_mk" 2>&1)
+echo "  INFO  build of $(q 'SELECT count(*) FROM e_mk') rows: $(( ($(date +%s%N) - t0) / 1000000 )) ms"
+check "R1 nrindex on a foreign-key column is built without error" "$(echo "$out" | grep -ci error)" "0"
+top=$(q "SELECT movie_id FROM movie_keyword GROUP BY movie_id ORDER BY count(*) DESC LIMIT 1")
+check "R2 the movie with the most keywords: all rows, index scan" \
+  "$(psql -X -q -At -d $DB -c 'SET enable_seqscan = off' -c 'SET enable_bitmapscan = off' -c "SELECT count(*), sum(keyword_id) FROM e_mk WHERE movie_id = $top" | tail -1)" \
+  "$(q "SELECT count(*), sum(keyword_id) FROM movie_keyword WHERE movie_id = $top")"
+check "R3 same movie, bitmap scan" \
+  "$(psql -X -q -At -d $DB -c 'SET enable_seqscan = off' -c 'SET enable_indexscan = off' -c "SELECT count(*), sum(keyword_id) FROM e_mk WHERE movie_id = $top" | tail -1)" \
+  "$(q "SELECT count(*), sum(keyword_id) FROM movie_keyword WHERE movie_id = $top")"
+want=$(q "SELECT count(*), sum(k.keyword_id) FROM generate_series(1, 2528312, 97) g JOIN movie_keyword k ON k.movie_id = g")
+got=$(psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c "SET enable_hashjoin = off" -c "SET enable_mergejoin = off" -c "SET enable_seqscan = off" \
+      -c "SELECT count(*), sum(k.keyword_id) FROM generate_series(1, 2528312, 97) g JOIN e_mk k ON k.movie_id = g" 2>&1 | tail -1)
+check "R4 join over 26,000 movies in a fresh session: same rows as btree" "$got" "$want"
+check "R5 a movie without keywords returns no row" "$(q 'SELECT count(*) FROM e_mk WHERE movie_id = -7')" "0"
 
 echo "=== build in one session (connection A) ==="
 t0=$(date +%s%N)
