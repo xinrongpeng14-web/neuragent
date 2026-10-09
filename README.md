@@ -10,7 +10,7 @@
 | `GlobalAgent_design.md` | 完整方案，v0.3 已按实测结果修订 |
 | `GlobalAgent_prototype.md` | 雏形方案：用一次对比实验判断可行性 |
 | `GlobalAgent_round2.md` | 第一轮实验结果分析（NQO 为何净负收益、SELIX 档位为何无差别）与第二轮方案 |
-| `GlobalAgent_hierarchical.md` | 分层 GA 实验方案：NQO 服务只读长查询、SELIX 承担写入，以 CPU 与内存验证可行性 |
+| `GlobalAgent_hierarchical.md` | 分层 GA 实验方案 v0.3：SELIX 建在 NQO 的表上，两者作用于同一批表，以查询延迟评价 |
 | `TUTORIAL.md` | 操作教程（第一轮）：在另一台机器上从建容器到跑完对比实验 |
 | `TUTORIAL_round2.md` | 操作教程（第二轮）：在已有容器上做两项校准并跑完第二轮实验 |
 | `NeuralDB_code_analysis.md` | NeurDB 代码分析，重点是 NQO 与 SELIX |
