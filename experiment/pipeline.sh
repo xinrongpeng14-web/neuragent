@@ -26,6 +26,14 @@
 #   selix_drop     drop every SELIX index built by selix_create
 #   f1 f2 f3 f4    feasibility checks on GROUP (long | short); exit code 2 = check not passed
 #
+# Hierarchical GA, plan v0.6 (config/hier_<GROUP>.json, results in runs/hier_<GROUP>/):
+#   h_baseline  arm O (NQO auto, index by cost) for H_BASE_EPISODES episodes -> refs.json
+#   h_sweep     the nine fixed commands, one episode each -> static_best.json
+#   h_train     PPO training of the GA, H_TRAIN_STEPS steps (resumes when a model exists and H_RESUME=1)
+#   h_eval      arms G / O / static-best / none / PG, alternating, H_SEEDS x H_EPISODES
+#   h_report    runs/hier_<GROUP>/report.md with the verdict G vs O
+#   h_all       h_baseline h_sweep h_train h_eval h_report
+#
 # Settings:
 #   CONFIG            default config/imdb_r2.json  (config/imdb_r2_short.json for a quick check)
 #   THRESHOLD         upper bound of the fast set, seconds                      default 1.0
@@ -42,7 +50,13 @@
 #   NQO_MODE          NQO mode of the nqo / static-best arms; default: best of sweep_nqo
 #   SELIX_PRESET      preset of the selix / static-best arms; default: best of sweep_selix
 #   RUN_PREFIX        prefix of the run names under <log_dir>                  default empty
-#   GROUP             query group of f1-f4: long or short                      default long
+#   GROUP             query group of f1-f4 and h_*: long or short             default long
+#   H_BASE_EPISODES   episodes of h_baseline                                   default 3
+#   H_TRAIN_STEPS     PPO steps of h_train                       default 600 (long) / 1600 (short)
+#   H_RESUME          1: h_train continues runs/hier_<GROUP>/train/model.zip   default 0
+#   H_SEEDS           evaluation seeds of h_eval                               default 2001,2002,2003
+#   H_EPISODES        episodes per seed and arm in h_eval                      default 2
+#   H_CLIENTS         parallel sessions, overrides the config (same value in every h_ stage)
 #   F_RUNS            runs per variant in f1-f4 (default: 1 / 3 / 3 / 2)
 #   SELIX_COLUMNS     table.column list for selix_create                       default all candidates
 set -euo pipefail
@@ -51,7 +65,9 @@ if [ "$(id -u)" = 0 ]; then
         GAIN_TIMEOUT=${GAIN_TIMEOUT:-} MEMCAL_KEYS=${MEMCAL_KEYS:-} MEMCAL_STEPS=${MEMCAL_STEPS:-} \
         BASELINE_EPISODES=${BASELINE_EPISODES:-} TRAIN_STEPS=${TRAIN_STEPS:-} EVAL_SEEDS=${EVAL_SEEDS:-} \
         EVAL_EPISODES=${EVAL_EPISODES:-} NQO_MODE=${NQO_MODE:-} SELIX_PRESET=${SELIX_PRESET:-} RUN_PREFIX=${RUN_PREFIX:-} \
-        GROUP=${GROUP:-} F_RUNS=${F_RUNS:-} SELIX_COLUMNS=${SELIX_COLUMNS:-} bash $0 $*"
+        GROUP=${GROUP:-} F_RUNS=${F_RUNS:-} SELIX_COLUMNS=${SELIX_COLUMNS:-} \
+        H_BASE_EPISODES=${H_BASE_EPISODES:-} H_TRAIN_STEPS=${H_TRAIN_STEPS:-} H_RESUME=${H_RESUME:-} \
+        H_SEEDS=${H_SEEDS:-} H_EPISODES=${H_EPISODES:-} H_CLIENTS=${H_CLIENTS:-} bash $0 $*"
 fi
 cd "$(dirname "$0")"
 PY=${PY:-/opt/venv/bin/python}
@@ -71,6 +87,16 @@ RUN_PREFIX=${RUN_PREFIX:-}
 GROUP=${GROUP:-long}
 F_RUNS=${F_RUNS:-0}
 SELIX_COLUMNS=${SELIX_COLUMNS:-}
+H_CONFIG=config/hier_${GROUP}.json
+H_DIR=runs/hier_${GROUP}
+H_BASE_EPISODES=${H_BASE_EPISODES:-3}
+[ "$GROUP" = short ] && H_TRAIN_DEFAULT=1600 || H_TRAIN_DEFAULT=600
+H_TRAIN_STEPS=${H_TRAIN_STEPS:-$H_TRAIN_DEFAULT}
+H_RESUME=${H_RESUME:-0}
+H_SEEDS=${H_SEEDS:-2001,2002,2003}
+H_EPISODES=${H_EPISODES:-2}
+H_CLIENTS=${H_CLIENTS:-}
+H_ARGS=(${H_CLIENTS:+--clients $H_CLIENTS})
 stage=${1:-}; shift || true
 [ -n "$stage" ] || { sed -n '2,40p' "$0"; exit 1; }
 
@@ -181,6 +207,29 @@ run_stage() {
             --runs "$F_RUNS" --out "$LOG_DIR/${RUN_PREFIX}${name}_${GROUP}" "$@" || rc=$?
         [ $rc = 2 ] && echo "($name not passed on the $GROUP group; see the report)"
         [ $rc = 0 ] || [ $rc = 2 ] || exit $rc ;;
+    h_baseline)
+        log "hierarchical GA ($GROUP): baseline of arm O, $H_BASE_EPISODES episodes"
+        $PY -m gaproto.hier.evaluate --config "$H_CONFIG" --mode baseline --episodes "$H_BASE_EPISODES" "${H_ARGS[@]}" "$@" ;;
+    h_sweep)
+        log "hierarchical GA ($GROUP): the nine fixed commands"
+        $PY -m gaproto.hier.evaluate --config "$H_CONFIG" --mode sweep "${H_ARGS[@]}" "$@" ;;
+    h_train)
+        log "hierarchical GA ($GROUP): PPO training, $H_TRAIN_STEPS steps"
+        local resume=()
+        [ "$H_RESUME" = 1 ] && [ -f "$H_DIR/train/model.zip" ] && resume=(--resume "$H_DIR/train/model.zip")
+        $PY -m gaproto.hier.train --config "$H_CONFIG" --total-steps "$H_TRAIN_STEPS" "${resume[@]}" "${H_ARGS[@]}" "$@" ;;
+    h_eval)
+        log "hierarchical GA ($GROUP): evaluation, seeds $H_SEEDS x $H_EPISODES"
+        local g=()
+        [ -f "$H_DIR/train/model.zip" ] && g=(--arm "G=ppo:$H_DIR/train/model.zip") || echo "no model at $H_DIR/train/model.zip; evaluating without G"
+        local sb=()
+        [ -f "$H_DIR/static_best.json" ] && sb=(--arm "static-best=static-best") || echo "no $H_DIR/static_best.json; evaluating without static-best"
+        $PY -m gaproto.hier.evaluate --config "$H_CONFIG" --mode eval "${g[@]}" --arm O=original "${sb[@]}" \
+            --arm none=fixed:off/cost --arm PG=fixed:off/btree --seeds "$H_SEEDS" --episodes-per-seed "$H_EPISODES" "${H_ARGS[@]}" "$@" ;;
+    h_report)
+        $PY -m gaproto.hier.report --config "$H_CONFIG" "$@" ;;
+    h_all)
+        for s in h_baseline h_sweep h_train h_eval h_report; do run_stage $s; done ;;
     all)
         for s in test queries seed baseline sweep_nqo sweep_selix train evaluate report; do run_stage $s; done ;;
     *)

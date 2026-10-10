@@ -1,0 +1,14 @@
+{
+  "db": {"host": "127.0.0.1", "port": 5432, "dbname": "imdb_ori", "user": "neurdb"},
+  "nqo": {"stats_url": "http://127.0.0.1:8666/stats"},
+  "group": "long",
+  "query_dir": "queries/job_long",
+  "step_queries": 1,
+  "clients": 1,
+  "repeats": 3,
+  "statement_timeout_ms": 300000,
+  "density": "dense",
+  "refs_path": "runs/hier_long/refs.json",
+  "static_best_path": "runs/hier_long/static_best.json",
+  "log_dir": "runs/hier_long"
+}
