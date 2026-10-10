@@ -1,7 +1,8 @@
 #!/bin/bash
 # Tests of the nrindex fixes E1 (per-backend lazy build), E2 (cost estimate)
 # and E5 (a key may hold many rows), D1/D2 (btree beside SELIX, rebuild on a
-# density change) and E6 (a key with more rows than a SELIX data node). Runs inside the container as neurdb, on imdb_ori.
+# density change), E6 (a key with more rows than a SELIX data node) and E7 (a
+# NULL join key under an inner bitmap scan). Runs inside the container as neurdb, on imdb_ori.
 export PATH=/opt/neurdb/bin:$PATH
 DB=imdb_ori
 pass=0; fail=0
@@ -130,6 +131,18 @@ want=$(q "SELECT count(*), sum(c.id) FROM generate_series(1, 4000) g JOIN cast_i
 got=$(psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c "SET enable_hashjoin = off" -c "SET enable_mergejoin = off" -c "SET enable_seqscan = off" -c "SET enable_bitmapscan = off" \
       -c "SELECT count(*), sum(c.id) FROM generate_series(1, 4000) g JOIN e_ci c ON c.person_role_id = g" 2>&1 | tail -1)
 check "K5 join over keys 1..4000 (big and small keys): same rows as cast_info" "$got" "$want"
+
+echo "=== E7: NULL join key under an inner bitmap scan ==="
+# a rescan with a NULL key kept the previous key's rows, and the bitmap scan
+# returned them again: JOB 26a gave 5437 rows instead of 1728 (ci.person_role_id is often NULL)
+NQ="FROM (SELECT CASE WHEN g % 3 = 0 THEN NULL ELSE g END AS k FROM generate_series(1, 3000) g) s JOIN TBL t ON t.id = s.k"
+bq() { psql -X -q -At -d $DB -c "SET client_min_messages = warning" -c "SET enable_hashjoin = off" -c "SET enable_mergejoin = off" \
+       -c "SET enable_seqscan = off" -c "SET enable_indexscan = off" -c "SET enable_indexonlyscan = off" -c "SET enable_memoize = off" -c "$1" 2>&1; }
+check "N1 the inner side is a bitmap scan of nrindex" \
+  "$(bq "EXPLAIN SELECT count(*) ${NQ//TBL/e_title}" | grep -c 'Bitmap Index Scan on e_title_nr')" "1"
+check "N2 NULL keys match no row: same rows as title" \
+  "$(bq "SELECT count(*), sum(t.id), sum((s.k IS NULL)::int) ${NQ//TBL/e_title}" | tail -1)" \
+  "$(q "SELECT count(*), sum(t.id), sum((s.k IS NULL)::int) ${NQ//TBL/title}")"
 
 echo "=== cleanup ==="
 psql -X -q -d $DB -c "SET client_min_messages = warning" -c "DROP TABLE IF EXISTS e_title, e_mk, e_ci" > /dev/null 2>&1
